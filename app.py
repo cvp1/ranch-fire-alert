@@ -1,4 +1,4 @@
-# app.py - Flask application with HTTP only (no SSL complexity)
+# app.py - Flask application with login system integration
 from flask import Flask, request, jsonify, render_template, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
@@ -10,6 +10,7 @@ import json
 import logging
 from werkzeug.serving import WSGIRequestHandler
 from dotenv import load_dotenv
+import hashlib
 
 # Load environment variables
 load_dotenv()
@@ -44,13 +45,12 @@ try:
         logger.info("Firebase initialized successfully")
     else:
         logger.warning(f"{firebase_key_path} not found. Creating dummy file...")
-        # Create a dummy Firebase key file for development
         dummy_key = {
             "type": "service_account",
-            "project_id": os.getenv('FIREBASE_PROJECT_ID', 'your-project-id'),
+            "project_id": os.getenv('FIREBASE_PROJECT_ID', 'dmr-fns'),
             "private_key_id": "dummy",
             "private_key": "-----BEGIN PRIVATE KEY-----\nDUMMY\n-----END PRIVATE KEY-----\n",
-            "client_email": f"dummy@{os.getenv('FIREBASE_PROJECT_ID', 'your-project')}.iam.gserviceaccount.com",
+            "client_email": f"dummy@{os.getenv('FIREBASE_PROJECT_ID', 'dmr-fns')}.iam.gserviceaccount.com",
             "client_id": "dummy",
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
             "token_uri": "https://oauth2.googleapis.com/token"
@@ -62,7 +62,7 @@ try:
 except Exception as e:
     logger.error(f"Firebase initialization failed: {e}")
 
-# Database Models
+# Database Models (Updated with login system)
 class Ranch(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -73,10 +73,13 @@ class Ranch(db.Model):
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=True)
     phone = db.Column(db.String(20), nullable=True)
+    password_hash = db.Column(db.String(128), nullable=True)  # Simple hash for demo
     fcm_token = db.Column(db.String(500), nullable=True)
     ranch_id = db.Column(db.Integer, db.ForeignKey('ranch.id'), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
+    last_login = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class FireAlert(db.Model):
@@ -104,6 +107,15 @@ class LivestockRequest(db.Model):
     notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+# Helper functions for authentication
+def simple_hash(password):
+    """Simple password hashing for demo purposes"""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def verify_password(password, password_hash):
+    """Verify password against hash"""
+    return simple_hash(password) == password_hash
+
 # Error handlers
 @app.errorhandler(500)
 def internal_error(error):
@@ -124,40 +136,15 @@ def get_config():
     """Return frontend configuration from environment variables"""
     config = {
         'firebase': {
-            'apiKey': os.getenv('FIREBASE_API_KEY'),
-            'authDomain': os.getenv('FIREBASE_AUTH_DOMAIN'),
-            'projectId': os.getenv('FIREBASE_PROJECT_ID'),
-            'storageBucket': os.getenv('FIREBASE_STORAGE_BUCKET'),
-            'messagingSenderId': os.getenv('FIREBASE_MESSAGING_SENDER_ID'),
-            'appId': os.getenv('FIREBASE_APP_ID')
+            'apiKey': os.getenv('FIREBASE_API_KEY', 'AIzaSyCWIvA2I6kzqokVpq5gjGlMj03Gp3Hwe3E'),
+            'authDomain': os.getenv('FIREBASE_AUTH_DOMAIN', 'dmr-fns.firebaseapp.com'),
+            'projectId': os.getenv('FIREBASE_PROJECT_ID', 'dmr-fns'),
+            'storageBucket': os.getenv('FIREBASE_STORAGE_BUCKET', 'dmr-fns.firebasestorage.app'),
+            'messagingSenderId': os.getenv('FIREBASE_MESSAGING_SENDER_ID', '668810466125'),
+            'appId': os.getenv('FIREBASE_APP_ID', '1:668810466125:web:aeb977be6046bc45d3dd04')
         },
-        'vapidKey': os.getenv('FIREBASE_VAPID_KEY')
+        'vapidKey': os.getenv('FIREBASE_VAPID_KEY', 'BMQhfotmIce_250TfjNABeg-l_OPWwe2ghk_BwKL0pmyPVVyEsCiaAHniErBw8pw7RJnMp9kD5oU3DDG1Tlod2k')
     }
-    
-    # Check if all required Firebase config is present
-    firebase_config_complete = all([
-        config['firebase']['apiKey'],
-        config['firebase']['authDomain'],
-        config['firebase']['projectId'],
-        config['firebase']['messagingSenderId'],
-        config['firebase']['appId'],
-        config['vapidKey']
-    ])
-    
-    if not firebase_config_complete:
-        logger.warning("Incomplete Firebase configuration in environment variables")
-        # Return dummy config for development
-        config = {
-            'firebase': {
-                'apiKey': 'demo-api-key',
-                'authDomain': 'demo-project.firebaseapp.com',
-                'projectId': 'demo-project',
-                'storageBucket': 'demo-project.appspot.com',
-                'messagingSenderId': '123456789',
-                'appId': '1:123456789:web:demo'
-            },
-            'vapidKey': 'demo-vapid-key'
-        }
     
     return jsonify(config)
 
@@ -172,6 +159,99 @@ def status():
         'timestamp': datetime.utcnow().isoformat()
     })
 
+# NEW LOGIN SYSTEM ROUTES
+
+@app.route('/api/check-user', methods=['POST'])
+def check_user():
+    """Check if a user exists by email or phone"""
+    try:
+        data = request.get_json()
+        identifier = data.get('identifier', '').strip()
+        
+        if not identifier:
+            return jsonify({'exists': False})
+        
+        user = None
+        if '@' in identifier:
+            user = User.query.filter_by(email=identifier.lower()).first()
+        else:
+            user = User.query.filter_by(phone=identifier).first()
+        
+        if user:
+            ranch = Ranch.query.get(user.ranch_id)
+            return jsonify({
+                'exists': True,
+                'user': {
+                    'id': user.id,
+                    'name': user.name,
+                    'email': user.email,
+                    'phone': user.phone,
+                    'ranch_name': ranch.name if ranch else 'Unknown Ranch',
+                    'has_password': bool(user.password_hash)
+                }
+            })
+        else:
+            return jsonify({'exists': False})
+            
+    except Exception as e:
+        logger.error(f"Check user error: {e}")
+        return jsonify({'exists': False})
+
+@app.route('/api/login', methods=['POST'])
+def login_user():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+        
+        identifier = data.get('identifier', '').strip()  # email or phone
+        password = data.get('password', '')
+        
+        if not identifier:
+            return jsonify({'success': False, 'error': 'Email or phone required'}), 400
+        
+        # Find user by email or phone
+        user = None
+        if '@' in identifier:
+            user = User.query.filter_by(email=identifier.lower()).first()
+        else:
+            user = User.query.filter_by(phone=identifier).first()
+        
+        if not user:
+            return jsonify({'success': False, 'error': 'User not found'}), 404
+        
+        # Check password if user has one
+        if user.password_hash:
+            if not password:
+                return jsonify({'success': False, 'error': 'Password required'}), 400
+            if not verify_password(password, user.password_hash):
+                return jsonify({'success': False, 'error': 'Invalid password'}), 401
+        
+        # Update FCM token if provided
+        if data.get('fcm_token'):
+            user.fcm_token = data['fcm_token']
+        
+        # Update last login
+        user.last_login = datetime.utcnow()
+        db.session.commit()
+        
+        logger.info(f"User logged in: {user.name} (ID: {user.id})")
+        return jsonify({
+            'success': True,
+            'user': {
+                'id': user.id,
+                'name': user.name,
+                'email': user.email,
+                'phone': user.phone,
+                'ranch_id': user.ranch_id,
+                'is_admin': user.is_admin
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Login error: {e}")
+        return jsonify({'success': False, 'error': 'Login failed'}), 500
+
 @app.route('/api/register', methods=['POST'])
 def register_user():
     try:
@@ -184,9 +264,33 @@ def register_user():
             if field not in data:
                 return jsonify({'success': False, 'error': f'Missing field: {field}'}), 400
         
+        # Check if user already exists by email or phone
+        email = data.get('email', '').strip().lower()
+        phone = data.get('phone', '').strip()
+        
+        existing_user = None
+        if email:
+            existing_user = User.query.filter_by(email=email).first()
+        elif phone:
+            existing_user = User.query.filter_by(phone=phone).first()
+        
+        if existing_user:
+            return jsonify({
+                'success': False, 
+                'error': 'User already exists. Please use login instead.',
+                'should_login': True
+            }), 400
+        
+        # Create password hash if provided
+        password_hash = None
+        if data.get('password'):
+            password_hash = simple_hash(data['password'])
+        
         user = User(
             name=data['name'],
-            phone=data.get('phone'),
+            email=email if email else None,
+            phone=phone if phone else None,
+            password_hash=password_hash,
             fcm_token=data.get('fcm_token'),
             ranch_id=data['ranch_id']
         )
@@ -195,12 +299,24 @@ def register_user():
         db.session.commit()
         
         logger.info(f"User registered: {user.name} (ID: {user.id})")
-        return jsonify({'success': True, 'user_id': user.id})
+        return jsonify({
+            'success': True, 
+            'user_id': user.id,
+            'user': {
+                'id': user.id,
+                'name': user.name,
+                'email': user.email,
+                'phone': user.phone,
+                'ranch_id': user.ranch_id
+            }
+        })
         
     except Exception as e:
         logger.error(f"Registration error: {e}")
         db.session.rollback()
         return jsonify({'success': False, 'error': 'Registration failed'}), 500
+
+# EXISTING ROUTES (Updated for login system compatibility)
 
 @app.route('/api/ranches', methods=['GET'])
 def get_ranches():
@@ -408,11 +524,53 @@ def create_tables():
     with app.app_context():
         db.create_all()
         
+        # Update existing database schema if needed
+        try:
+            # Check if User table needs email/password columns
+            from sqlalchemy import inspect, text
+            inspector = inspect(db.engine)
+            user_columns = [column['name'] for column in inspector.get_columns('user')]
+            
+            # Use the correct SQLAlchemy 2.0+ syntax
+            if 'email' not in user_columns:
+                logger.info("Adding email column to User table")
+                with db.engine.connect() as conn:
+                    conn.execute(text('ALTER TABLE "user" ADD COLUMN email VARCHAR(120)'))
+                    conn.commit()
+            
+            if 'password_hash' not in user_columns:
+                logger.info("Adding password_hash column to User table")
+                with db.engine.connect() as conn:
+                    conn.execute(text('ALTER TABLE "user" ADD COLUMN password_hash VARCHAR(128)'))
+                    conn.commit()
+                
+            if 'last_login' not in user_columns:
+                logger.info("Adding last_login column to User table")
+                with db.engine.connect() as conn:
+                    conn.execute(text('ALTER TABLE "user" ADD COLUMN last_login TIMESTAMP'))
+                    conn.commit()
+                    
+            if 'is_admin' not in user_columns:
+                logger.info("Adding is_admin column to User table")
+                with db.engine.connect() as conn:
+                    conn.execute(text('ALTER TABLE "user" ADD COLUMN is_admin BOOLEAN DEFAULT FALSE'))
+                    conn.commit()
+                    
+            if 'created_at' not in user_columns:
+                logger.info("Adding created_at column to User table")
+                with db.engine.connect() as conn:
+                    conn.execute(text('ALTER TABLE "user" ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP'))
+                    conn.commit()
+                
+        except Exception as e:
+            logger.info(f"Database schema update not needed or failed: {e}")
+        
+        # Create sample ranches if none exist
         if Ranch.query.count() == 0:
             sample_ranches = [
-                Ranch(name="Dragoon Mountain Ranch", latitude=34.0522, longitude=-118.2437, radius_miles=10.0),
-                Ranch(name="Mountain View Ranch", latitude=34.1522, longitude=-118.3437, radius_miles=8.0),
-                Ranch(name="Desert Springs Ranch", latitude=33.9522, longitude=-118.1437, radius_miles=12.0)
+                Ranch(name="Dragoon Mountain Ranch", latitude=31.9190, longitude=-109.9673, radius_miles=10.0),
+                Ranch(name="Mountain View Ranch", latitude=31.9290, longitude=-109.9773, radius_miles=8.0),
+                Ranch(name="Desert Springs Ranch", latitude=31.9090, longitude=-109.9573, radius_miles=12.0)
             ]
             
             for ranch in sample_ranches:
@@ -420,11 +578,12 @@ def create_tables():
             
             db.session.commit()
             logger.info(f"Created {len(sample_ranches)} sample ranches")
+        else:
+            logger.info(f"Found {Ranch.query.count()} existing ranches")
 
 if __name__ == '__main__':
     create_tables()
     
-    # Configuration from environment variables
     port = int(os.getenv('PORT', 8088))
     host = os.getenv('HOST', '0.0.0.0')
     debug = os.getenv('FLASK_DEBUG', 'false').lower() == 'true'

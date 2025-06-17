@@ -1,11 +1,14 @@
 {
   "name": "Ranch Fire Alert System",
   "short_name": "Fire Alert",
-  "description": "Emergency fire notification system for ranch communities",
+  "description": "Emergency fire notification system for ranch communities with livestock coordination",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#1e3c72",
   "theme_color": "#d32f2f",
+  "orientation": "portrait",
+  "scope": "/",
+  "lang": "en-US",
   "icons": [
     {
       "src": "/icon-192.png",
@@ -20,22 +23,6 @@
       "purpose": "any maskable"
     }
   ],
-  "screenshots": [
-    {
-      "src": "/screenshot-mobile.png",
-      "sizes": "390x844",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "Fire alerts on mobile"
-    },
-    {
-      "src": "/screenshot-tablet.png",
-      "sizes": "768x1024",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "Ranch management on tablet"
-    }
-  ],
   "categories": ["productivity", "utilities", "business"],
   "shortcuts": [
     {
@@ -45,9 +32,8 @@
       "url": "/?action=alert",
       "icons": [
         {
-          "src": "/icon-alert-96.png",
-          "sizes": "96x96",
-          "type": "image/png"
+          "src": "/icon-192.png",
+          "sizes": "192x192"
         }
       ]
     },
@@ -58,20 +44,10 @@
       "url": "/?action=livestock",
       "icons": [
         {
-          "src": "/icon-livestock-96.png",
-          "sizes": "96x96",
-          "type": "image/png"
+          "src": "/icon-192.png",
+          "sizes": "192x192"
         }
       ]
     }
-  ],
-  "related_applications": [],
-  "prefer_related_applications": false,
-  "edge_side_panel": {
-    "preferred_width": 400
-  },
-  "handle_links": "preferred",
-  "launch_handler": {
-    "client_mode": "focus-existing"
-  }
+  ]
 }

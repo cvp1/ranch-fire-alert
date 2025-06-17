@@ -5,7 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ranch Fire Alert System</title>
     
-    <!-- Basic meta tags -->
+    <!-- PWA Meta Tags -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#d32f2f">
+    <link rel="icon" href="/favicon.ico">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Fire Alert">
     <meta name="description" content="Emergency fire notification system for ranch communities">
     
     <style>
@@ -116,10 +122,16 @@
             width: 100%;
             margin-bottom: 10px;
             font-weight: 500;
+            transition: background 0.2s;
         }
         
         .btn:hover {
             background: #b71c1c;
+        }
+        
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
         }
         
         .btn-secondary {
@@ -136,6 +148,17 @@
         
         .btn-success:hover {
             background: #2e7d32;
+        }
+        
+        .btn-outline {
+            background: transparent;
+            color: #d32f2f;
+            border: 2px solid #d32f2f;
+        }
+        
+        .btn-outline:hover {
+            background: #d32f2f;
+            color: white;
         }
         
         .form-group {
@@ -156,6 +179,14 @@
             border: 1px solid #ddd;
             border-radius: 6px;
             font-size: 16px;
+        }
+        
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #d32f2f;
+            box-shadow: 0 0 0 2px rgba(211, 47, 47, 0.1);
         }
         
         .form-group textarea {
@@ -234,6 +265,15 @@
             border-left: 4px solid #c62828;
         }
         
+        .success-message {
+            background: #e8f5e8;
+            color: #2e7d32;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #4caf50;
+        }
+        
         .info-message {
             background: #e3f2fd;
             color: #1565c0;
@@ -241,6 +281,64 @@
             border-radius: 8px;
             margin-bottom: 20px;
             border-left: 4px solid #1976d2;
+        }
+        
+        .text-center {
+            text-align: center;
+        }
+        
+        .text-link {
+            color: #1976d2;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        
+        .text-link:hover {
+            text-decoration: underline;
+        }
+        
+        .user-info {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .user-info h3 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #d32f2f;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .auth-toggle {
+            text-align: center;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+        }
+        
+        .install-prompt {
+            background: #4caf50;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
         }
     </style>
 </head>
@@ -255,38 +353,113 @@
             </div>
         </div>
         
-        <!-- HTTP Development Notice -->
-        <div class="info-message">
-            <strong>Development Mode:</strong> Running on HTTP. Some PWA features (install, push notifications) require HTTPS for testing.
+        <!-- Install Prompt (hidden by default) -->
+        <div id="installPrompt" class="install-prompt hidden">
+            <p>📱 Install this app on your phone for instant fire alerts!</p>
+            <button class="btn btn-success" onclick="installApp()">Install App</button>
         </div>
         
-        <!-- Error Display -->
+        <!-- Error/Success Display -->
         <div id="errorDisplay" class="error-message hidden">
             <strong>Error:</strong> <span id="errorMessage"></span>
         </div>
         
-        <!-- Registration Form -->
-        <div id="registrationForm" class="card">
-            <h2>Register for Alerts</h2>
+        <div id="successDisplay" class="success-message hidden">
+            <span id="successMessage"></span>
+        </div>
+        
+        <!-- User Check Form -->
+        <div id="userCheckForm" class="card">
+            <h2>Welcome to Ranch Fire Alert</h2>
+            <p style="margin-bottom: 20px; color: #666;">Enter your email or phone number to get started.</p>
+            
             <div class="form-group">
-                <label>Your Name</label>
+                <label>Email or Phone Number</label>
+                <input type="text" id="userIdentifier" placeholder="your@email.com or (555) 123-4567" required>
+            </div>
+            
+            <button class="btn" onclick="checkUser()">
+                <span id="checkUserBtn">Continue</span>
+                <span id="checkUserLoading" class="loading hidden"></span>
+            </button>
+        </div>
+        
+        <!-- Login Form -->
+        <div id="loginForm" class="card hidden">
+            <h2>Welcome Back!</h2>
+            <div id="existingUserInfo" class="user-info"></div>
+            
+            <div class="form-group">
+                <label>Password</label>
+                <input type="password" id="loginPassword" placeholder="Enter your password" required>
+            </div>
+            
+            <button class="btn" onclick="loginUser()">
+                <span id="loginBtn">Sign In</span>
+                <span id="loginLoading" class="loading hidden"></span>
+            </button>
+            
+            <div class="auth-toggle">
+                <a href="#" class="text-link" onclick="showUserCheck()">← Back to start</a>
+            </div>
+        </div>
+        
+        <!-- Registration Form -->
+        <div id="registrationForm" class="card hidden">
+            <h2 id="registrationTitle">Create Your Account</h2>
+            <p id="registrationSubtitle" style="margin-bottom: 20px; color: #666;">Join your ranch community for emergency alerts.</p>
+            
+            <div class="form-group">
+                <label>Your Full Name</label>
                 <input type="text" id="userName" placeholder="Enter your name" required>
             </div>
+            
             <div class="form-group">
-                <label>Phone (optional)</label>
+                <label>Email Address</label>
+                <input type="email" id="userEmail" placeholder="your@email.com">
+            </div>
+            
+            <div class="form-group">
+                <label>Phone Number</label>
                 <input type="tel" id="userPhone" placeholder="(555) 123-4567">
             </div>
+            
             <div class="form-group">
-                <label>Select Ranch</label>
+                <label>Create Password (Optional)</label>
+                <input type="password" id="userPassword" placeholder="Leave blank for passwordless access">
+                <small style="color: #666; font-size: 12px;">Password is optional. You can always sign in with just your email/phone.</small>
+            </div>
+            
+            <div class="form-group">
+                <label>Select Your Ranch</label>
                 <select id="ranchSelect" required>
                     <option value="">Choose your ranch...</option>
                 </select>
             </div>
-            <button class="btn" onclick="registerUser()">Register for Alerts</button>
+            
+            <button class="btn" onclick="registerUser()">
+                <span id="registerBtn">Create Account & Enable Alerts</span>
+                <span id="registerLoading" class="loading hidden"></span>
+            </button>
+            
+            <div class="auth-toggle">
+                <a href="#" class="text-link" onclick="showUserCheck()">← Back to start</a>
+            </div>
         </div>
         
         <!-- Main App -->
         <div id="mainApp" class="hidden">
+            <!-- User Info Bar -->
+            <div class="user-info">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h3 id="currentUserName">Welcome!</h3>
+                        <small id="currentUserDetails"></small>
+                    </div>
+                    <button class="btn-outline" style="padding: 8px 12px; font-size: 12px;" onclick="logoutUser()">Logout</button>
+                </div>
+            </div>
+            
             <div class="tabs">
                 <button class="tab active" onclick="showTab('alerts')">🔥 Alerts</button>
                 <button class="tab" onclick="showTab('livestock')">🐄 Livestock</button>
@@ -366,13 +539,39 @@
             </div>
         </div>
     </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js"></script>
     
     <script>
         // Global app state
         let currentUser = null;
         let appConfig = null;
+        let currentUserData = null;
+        let deferredPrompt = null;
+        let messaging = null;
         
-        // Error handling
+        // PWA Install handling
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            document.getElementById('installPrompt').classList.remove('hidden');
+        });
+        
+        function installApp() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    if (choiceResult.outcome === 'accepted') {
+                        document.getElementById('installPrompt').classList.add('hidden');
+                    }
+                    deferredPrompt = null;
+                });
+            }
+        }
+        
+        // Error and success handling
         function showError(message) {
             console.error('App Error:', message);
             
@@ -382,45 +581,329 @@
             errorMessage.textContent = message;
             errorDisplay.classList.remove('hidden');
             
+            // Hide success message
+            document.getElementById('successDisplay').classList.add('hidden');
+            
             // Auto-hide after 5 seconds
             setTimeout(() => {
                 errorDisplay.classList.add('hidden');
             }, 5000);
         }
         
-        // Load app configuration from server
-        async function loadAppConfig() {
+        function showSuccess(message) {
+            const successDisplay = document.getElementById('successDisplay');
+            const successMessage = document.getElementById('successMessage');
+            
+            successMessage.textContent = message;
+            successDisplay.classList.remove('hidden');
+            
+            // Hide error message
+            document.getElementById('errorDisplay').classList.add('hidden');
+            
+            // Auto-hide after 3 seconds
+            setTimeout(() => {
+                successDisplay.classList.add('hidden');
+            }, 3000);
+        }
+        
+        function setLoading(elementId, isLoading) {
+            const btn = document.getElementById(elementId);
+            const loading = document.getElementById(elementId.replace('Btn', 'Loading'));
+            
+            if (isLoading) {
+                btn.classList.add('hidden');
+                loading.classList.remove('hidden');
+            } else {
+                btn.classList.remove('hidden');
+                loading.classList.add('hidden');
+            }
+        }
+        
+        // Navigation functions
+        function showUserCheck() {
+            hideAllForms();
+            document.getElementById('userCheckForm').classList.remove('hidden');
+            document.getElementById('userIdentifier').value = '';
+            document.getElementById('userIdentifier').focus();
+        }
+        
+        function showLogin(userData) {
+            hideAllForms();
+            
+            const loginForm = document.getElementById('loginForm');
+            const userInfo = document.getElementById('existingUserInfo');
+            
+            userInfo.innerHTML = `
+                <h4>${userData.name}</h4>
+                <p style="margin: 5px 0; color: #666;">${userData.email || userData.phone}</p>
+                <p style="margin: 5px 0; color: #666;">${userData.ranch_name}</p>
+            `;
+            
+            loginForm.classList.remove('hidden');
+            document.getElementById('loginPassword').focus();
+        }
+        
+        function showRegistration(identifier = '') {
+            hideAllForms();
+            
+            // Pre-fill the identifier
+            if (identifier.includes('@')) {
+                document.getElementById('userEmail').value = identifier;
+                document.getElementById('userPhone').value = '';
+            } else {
+                document.getElementById('userPhone').value = identifier;
+                document.getElementById('userEmail').value = '';
+            }
+            
+            document.getElementById('registrationForm').classList.remove('hidden');
+            document.getElementById('userName').focus();
+        }
+        
+        function hideAllForms() {
+            document.getElementById('userCheckForm').classList.add('hidden');
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('registrationForm').classList.add('hidden');
+            document.getElementById('mainApp').classList.add('hidden');
+        }
+        
+        // User authentication flow
+        async function checkUser() {
+            const identifier = document.getElementById('userIdentifier').value.trim();
+            
+            if (!identifier) {
+                showError('Please enter your email or phone number');
+                return;
+            }
+            
+            setLoading('checkUserBtn', true);
+            
             try {
-                const response = await fetch('/api/config');
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                const response = await fetch('/api/check-user', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        identifier: identifier
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.exists) {
+                    if (result.user.has_password) {
+                        showLogin(result.user);
+                    } else {
+                        // Auto-login for users without password
+                        await loginUser(identifier, null, true);
+                    }
+                } else {
+                    showRegistration(identifier);
                 }
                 
-                appConfig = await response.json();
-                console.log('App configuration loaded');
+            } catch (error) {
+                console.error('Check user error:', error);
+                showError('Failed to check user. Please try again.');
+            } finally {
+                setLoading('checkUserBtn', false);
+            }
+        }
+        
+        async function loginUser(identifier = null, password = null, skipPassword = false) {
+            if (!identifier) {
+                identifier = document.getElementById('userIdentifier').value.trim();
+            }
+            
+            if (!password && !skipPassword) {
+                password = document.getElementById('loginPassword').value;
+            }
+            
+            if (!identifier) {
+                showError('Please enter your email or phone number');
+                return;
+            }
+            
+            if (!skipPassword && !password) {
+                showError('Please enter your password');
+                return;
+            }
+            
+            setLoading('loginBtn', true);
+            
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        identifier: identifier,
+                        password: password || '',
+                        fcm_token: null // We'll add Firebase integration later
+                    })
+                });
                 
-                return appConfig;
+                const result = await response.json();
+                
+                if (result.success) {
+                    currentUser = result.user;
+                    currentUserData = result.user;
+                    
+                    // Save to localStorage
+                    localStorage.setItem('fireAlertUser', JSON.stringify(currentUser));
+                    
+                    showSuccess(`Welcome back, ${currentUser.name}!`);
+                    setTimeout(() => {
+                        showMainApp();
+                    }, 1000);
+                } else {
+                    showError(result.error || 'Login failed');
+                }
                 
             } catch (error) {
-                console.error('Failed to load app configuration:', error);
-                showError('Failed to load app configuration');
-                return null;
+                console.error('Login error:', error);
+                showError('Login failed. Please check your connection.');
+            } finally {
+                setLoading('loginBtn', false);
             }
+        }
+        
+        async function registerUser() {
+            const name = document.getElementById('userName').value.trim();
+            const email = document.getElementById('userEmail').value.trim();
+            const phone = document.getElementById('userPhone').value.trim();
+            const password = document.getElementById('userPassword').value;
+            const ranchId = document.getElementById('ranchSelect').value;
+            
+            if (!name) {
+                showError('Please enter your name');
+                return;
+            }
+            
+            if (!email && !phone) {
+                showError('Please enter either email or phone number');
+                return;
+            }
+            
+            if (!ranchId) {
+                showError('Please select your ranch');
+                return;
+            }
+            
+            setLoading('registerBtn', true);
+            
+            try {
+                const response = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name: name,
+                        email: email || null,
+                        phone: phone || null,
+                        password: password || null,
+                        ranch_id: parseInt(ranchId),
+                        fcm_token: null // We'll add Firebase integration later
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    currentUser = result.user;
+                    currentUserData = result.user;
+                    
+                    // Save to localStorage
+                    localStorage.setItem('fireAlertUser', JSON.stringify(currentUser));
+                    
+                    showSuccess(`Welcome to Ranch Fire Alert, ${currentUser.name}!`);
+                    setTimeout(() => {
+                        showMainApp();
+                    }, 1000);
+                } else {
+                    if (result.should_login) {
+                        showError('User already exists. Redirecting to login...');
+                        setTimeout(() => {
+                            showUserCheck();
+                        }, 2000);
+                    } else {
+                        showError(result.error || 'Registration failed');
+                    }
+                }
+                
+            } catch (error) {
+                console.error('Registration error:', error);
+                showError('Registration failed. Please check your connection.');
+            } finally {
+                setLoading('registerBtn', false);
+            }
+        }
+        
+        function logoutUser() {
+            localStorage.removeItem('fireAlertUser');
+            currentUser = null;
+            currentUserData = null;
+            showSuccess('You have been logged out.');
+            setTimeout(() => {
+                showUserCheck();
+            }, 1000);
+        }
+        
+        // Show main app
+        function showMainApp() {
+            hideAllForms();
+            document.getElementById('mainApp').classList.remove('hidden');
+            
+            // Update user info display
+            if (currentUser) {
+                document.getElementById('currentUserName').textContent = `Welcome, ${currentUser.name}!`;
+                
+                let details = [];
+                if (currentUser.email) details.push(currentUser.email);
+                if (currentUser.phone) details.push(currentUser.phone);
+                
+                document.getElementById('currentUserDetails').textContent = details.join(' • ');
+            }
+            
+            loadAlerts();
+            
+            // Set up periodic refresh
+            setInterval(loadAlerts, 30000);
         }
         
         // Initialize app
         window.addEventListener('load', async () => {
-            // Load configuration
-            await loadAppConfig();
+            // Register service worker
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => console.log('SW registered'))
+                    .catch(error => console.log('SW registration failed'));
+            }
             
-            // Check if user is already registered
+            // Initialize Firebase
+            try {
+                const configResponse = await fetch('/api/config');
+                appConfig = await configResponse.json();
+                
+                firebase.initializeApp(appConfig.firebase);
+                messaging = firebase.messaging();
+                console.log('Firebase initialized');
+            } catch (error) {
+                console.error('Firebase initialization failed:', error);
+            }
+            
+            // Check if user is already logged in
             const savedUser = JSON.parse(localStorage.getItem('fireAlertUser') || 'null');
             if (savedUser) {
                 currentUser = savedUser;
+                currentUserData = savedUser;
                 showMainApp();
+            } else {
+                showUserCheck();
             }
             
-            loadRanches();
+            await loadRanches();
             updateConnectionStatus(true);
         });
         
@@ -454,72 +937,6 @@
             }
         }
         
-        // Register user (simplified for HTTP)
-        async function registerUser() {
-            const name = document.getElementById('userName').value;
-            const phone = document.getElementById('userPhone').value;
-            const ranchId = document.getElementById('ranchSelect').value;
-            
-            if (!name || !ranchId) {
-                showError('Please fill in required fields');
-                return;
-            }
-            
-            try {
-                console.log('Registering user...');
-                
-                // Register user with server (no FCM token for HTTP)
-                const response = await fetch('/api/register', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        name: name,
-                        phone: phone,
-                        ranch_id: parseInt(ranchId),
-                        fcm_token: null // No push notifications on HTTP
-                    })
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`Registration failed: ${response.statusText}`);
-                }
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    currentUser = {
-                        id: result.user_id,
-                        name: name,
-                        ranch_id: parseInt(ranchId)
-                    };
-                    
-                    localStorage.setItem('fireAlertUser', JSON.stringify(currentUser));
-                    showMainApp();
-                    
-                    alert('✅ Registration successful!');
-                    
-                } else {
-                    throw new Error(result.error || 'Registration failed');
-                }
-                
-            } catch (error) {
-                console.error('Registration error:', error);
-                showError('Registration failed: ' + error.message);
-            }
-        }
-        
-        // Show main app
-        function showMainApp() {
-            document.getElementById('registrationForm').classList.add('hidden');
-            document.getElementById('mainApp').classList.remove('hidden');
-            loadAlerts();
-            
-            // Set up periodic refresh
-            setInterval(loadAlerts, 30000);
-        }
-        
         // Tab navigation
         function showTab(tabName) {
             // Hide all tabs
@@ -545,6 +962,8 @@
         
         // Load active alerts
         async function loadAlerts() {
+            if (!currentUser) return;
+            
             try {
                 const response = await fetch(`/api/alerts?ranch_id=${currentUser.ranch_id}`);
                 
@@ -615,7 +1034,7 @@
                 const result = await response.json();
                 
                 if (result.success) {
-                    alert('🚨 Fire alert sent to all ranch members!');
+                    showSuccess('🚨 Fire alert sent to all ranch members!');
                     document.getElementById('alertTitle').value = '';
                     document.getElementById('alertMessage').value = '';
                     loadAlerts();
@@ -669,7 +1088,7 @@
                 
                 const result = await response.json();
                 if (result.success) {
-                    alert('✅ Livestock help request sent to ranch members!');
+                    showSuccess('✅ Livestock help request sent to ranch members!');
                     // Clear form
                     document.getElementById('animalCount').value = '1';
                     document.getElementById('pickupLocation').value = '';
@@ -743,6 +1162,69 @@
         // Handle network status
         window.addEventListener('online', () => updateConnectionStatus(true));
         window.addEventListener('offline', () => updateConnectionStatus(false));
+        
+        // Handle Enter key on forms
+        document.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                const activeForm = document.querySelector('.card:not(.hidden)');
+                if (activeForm) {
+                    if (activeForm.id === 'userCheckForm') {
+                        checkUser();
+                    } else if (activeForm.id === 'loginForm') {
+                        loginUser();
+                    } else if (activeForm.id === 'registrationForm') {
+                        registerUser();
+                    }
+                }
+            }
+        });
+        
+        // Firebase messaging (if available)
+        if (messaging) {
+            // Handle foreground messages
+            messaging.onMessage((payload) => {
+                console.log('Message received in foreground:', payload);
+                
+                // Show notification even when app is open
+                if (payload.notification) {
+                    new Notification(payload.notification.title, {
+                        body: payload.notification.body,
+                        icon: '/icon-192.png',
+                        badge: '/icon-192.png'
+                    });
+                }
+                
+                // Refresh data based on message type
+                if (payload.data) {
+                    if (payload.data.type === 'fire_alert') {
+                        loadAlerts();
+                    } else if (payload.data.type === 'livestock_request') {
+                        loadLivestockRequests();
+                    }
+                }
+            });
+            
+            // Handle token refresh
+            messaging.onTokenRefresh(() => {
+                messaging.getToken({ vapidKey: appConfig?.vapidKey }).then((refreshedToken) => {
+                    console.log('Token refreshed:', refreshedToken);
+                    
+                    // Send the new token to your server
+                    if (currentUser) {
+                        fetch('/api/update-token', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                user_id: currentUser.id,
+                                fcm_token: refreshedToken
+                            })
+                        });
+                    }
+                });
+            });
+        }
     </script>
 </body>
 </html>
