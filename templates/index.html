@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ranch Fire Alert System</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#d32f2f">
+    <link rel="icon" href="/favicon.ico">
+    
+    <!-- PWA Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Fire Alert">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        .alert-card {
+            border-left: 5px solid #d32f2f;
+        }
+        
+        .alert-card.critical {
+            border-left-color: #8B0000;
+            background: #fff5f5;
+        }
+        
+        .alert-card.high {
+            border-left-color: #FF0000;
+            background: #fff8f8;
+        }
+        
+        .alert-card.medium {
+            border-left-color: #FF4500;
+        }
+        
+        .alert-card.low {
+            border-left-color: #FFA500;
+        }
+        
+        .severity-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+        
+        .severity-critical {
+            background: #8B0000;
+            color: white;
+        }
+        
+        .severity-high {
+            background: #FF0000;
+            color: white;
+        }
+        
+        .severity-medium {
+            background: #FF4500;
+            color: white;
+        }
+        
+        .severity-low {
+            background: #FFA500;
+            color: white;
+        }
+        
+        .btn {
+            background: #d32f2f;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+            margin-bottom: 10px;
+            font-weight: 500;
+        }
+        
+        .btn:hover {
+            background: #b71c1c;
+        }
+        
+        .btn-secondary {
+            background: #1976d2;
+        }
+        
+        .btn-secondary:hover {
+            background: #1565c0;
+        }
+        
+        .btn-success {
+            background: #388e3c;
+        }
+        
+        .btn-success:hover {
+            background: #2e7d32;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+        
+        .form-group textarea {
+            height: 80px;
+            resize: vertical;
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        
+        .status-online {
+            background: #4caf50;
+        }
+        
+        .status-offline {
+            background: #f44336;
+        }
+        
+        .livestock-request {
+            background: #fff3e0;
+            border-left: 4px solid #ff9800;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .tabs {
+            display: flex;
+            background: white;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        
+        .tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            background: #f5f5f5;
+            cursor: pointer;
+            border: none;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        .tab.active {
+            background: #d32f2f;
+            color: white;
+        }
+        
+        .timestamp {
+            font-size: 12px;
+            color: #666;
+            margin-top: 10px;
+        }
+        
+        .install-prompt {
+            background: #4caf50;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔥 Ranch Fire Alert</h1>
+            <p>Emergency notification system</p>
+            <div>
+                <span class="status-indicator" id="connectionStatus"></span>
+                <span id="connectionText">Connecting...</span>
+            </div>
+        </div>
+        
+        <!-- Install Prompt (hidden by default) -->
+        <div id="installPrompt" class="install-prompt hidden">
+            <p>📱 Install this app on your phone for instant fire alerts!</p>
+            <button class="btn btn-success" onclick="installApp()">Install App</button>
+        </div>
+        
+        <!-- Registration Form (shown when not registered) -->
+        <div id="registrationForm" class="card">
+            <h2>Register for Alerts</h2>
+            <div class="form-group">
+                <label>Your Name</label>
+                <input type="text" id="userName" placeholder="Enter your name" required>
+            </div>
+            <div class="form-group">
+                <label>Phone (optional)</label>
+                <input type="tel" id="userPhone" placeholder="(555) 123-4567">
+            </div>
+            <div class="form-group">
+                <label>Select Ranch</label>
+                <select id="ranchSelect" required>
+                    <option value="">Choose your ranch...</option>
+                </select>
+            </div>
+            <button class="btn" onclick="registerUser()">Register & Enable Alerts</button>
+        </div>
+        
+        <!-- Main App (hidden until registered) -->
+        <div id="mainApp" class="hidden">
+            <div class="tabs">
+                <button class="tab active" onclick="showTab('alerts')">🔥 Alerts</button>
+                <button class="tab" onclick="showTab('livestock')">🐄 Livestock</button>
+                <button class="tab" onclick="showTab('admin')">⚙️ Admin</button>
+            </div>
+            
+            <!-- Alerts Tab -->
+            <div id="alertsTab">
+                <div id="currentAlerts"></div>
+                <div id="noAlerts" class="card" style="text-align: center;">
+                    <h3>🟢 All Clear</h3>
+                    <p>No active fire alerts in your area.</p>
+                </div>
+            </div>
+            
+            <!-- Livestock Tab -->
+            <div id="livestockTab" class="hidden">
+                <div class="card">
+                    <h3>Request Livestock Help</h3>
+                    <div class="form-group">
+                        <label>Animal Type</label>
+                        <select id="animalType">
+                            <option value="cattle">Cattle</option>
+                            <option value="horses">Horses</option>
+                            <option value="sheep">Sheep</option>
+                            <option value="goats">Goats</option>
+                            <option value="pigs">Pigs</option>
+                            <option value="chickens">Chickens</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Number of Animals</label>
+                        <input type="number" id="animalCount" min="1" value="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Pickup Location</label>
+                        <input type="text" id="pickupLocation" placeholder="Address or description">
+                    </div>
+                    <div class="form-group">
+                        <label>Your Contact Info</label>
+                        <input type="text" id="contactInfo" placeholder="Phone number or other contact">
+                    </div>
+                    <div class="form-group">
+                        <label>Additional Notes</label>
+                        <textarea id="requestNotes" placeholder="Any special instructions..."></textarea>
+                    </div>
+                    <button class="btn" onclick="requestLivestockHelp()">Send Help Request</button>
+                </div>
+                
+                <div id="livestockRequests"></div>
+            </div>
+            
+            <!-- Admin Tab -->
+            <div id="adminTab" class="hidden">
+                <div class="card">
+                    <h3>Send Fire Alert</h3>
+                    <div class="form-group">
+                        <label>Alert Title</label>
+                        <input type="text" id="alertTitle" placeholder="Fire near North Pasture">
+                    </div>
+                    <div class="form-group">
+                        <label>Severity Level</label>
+                        <select id="alertSeverity">
+                            <option value="low">Low - Monitor</option>
+                            <option value="medium" selected>Medium - Prepare</option>
+                            <option value="high">High - Evacuate Livestock</option>
+                            <option value="critical">Critical - Immediate Evacuation</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Message</label>
+                        <textarea id="alertMessage" placeholder="Describe the fire location, wind direction, and recommended actions..."></textarea>
+                    </div>
+                    <button class="btn" onclick="sendFireAlert()">🚨 Send Alert to Ranch</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js"></script>
+    
+    <script>
+        // Firebase configuration - Replace with your config
+        const firebaseConfig = {
+            apiKey: "AIzaSyCWIvA2I6kzqokVpq5gjGlMj03Gp3Hwe3E",
+            authDomain: "dmr-fns.firebaseapp.com",
+            projectId: "dmr-fns",
+            storageBucket: "dmr-fns.firebasestorage.app",
+            messagingSenderId: "668810466125",
+            appId: "1:668810466125:web:aeb977be6046bc45d3dd04"
+        };
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const messaging = firebase.messaging();
+        
+        // App state
+        let currentUser = null;
+        let currentRanch = null;
+        let deferredPrompt = null;
+        
+        // PWA Install handling
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            document.getElementById('installPrompt').classList.remove('hidden');
+        });
+        
+        function installApp() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    if (choiceResult.outcome === 'accepted') {
+                        document.getElementById('installPrompt').classList.add('hidden');
+                    }
+                    deferredPrompt = null;
+                });
+            }
+        }
+        
+        // Initialize app
+        window.addEventListener('load', () => {
+            // Register service worker
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => console.log('SW registered'))
+                    .catch(error => console.log('SW registration failed'));
+            }
+            
+            // Check if user is already registered
+            const savedUser = JSON.parse(localStorage.getItem('fireAlertUser') || 'null');
+            if (savedUser) {
+                currentUser = savedUser;
+                showMainApp();
+            }
+            
+            loadRanches();
+            updateConnectionStatus(true);
+        });
+        
+        // Load available ranches
+        async function loadRanches() {
+            try {
+                const response = await fetch('/api/ranches');
+                const ranches = await response.json();
+                
+                const select = document.getElementById('ranchSelect');
+                ranches.forEach(ranch => {
+                    const option = document.createElement('option');
+                    option.value = ranch.id;
+                    option.textContent = ranch.name;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading ranches:', error);
+                updateConnectionStatus(false);
+            }
+        }
+        
+        // Register user
+        async function registerUser() {
+            const name = document.getElementById('userName').value;
+            const phone = document.getElementById('userPhone').value;
+            const ranchId = document.getElementById('ranchSelect').value;
+            
+            if (!name || !ranchId) {
+                alert('Please fill in required fields');
+                return;
+            }
+            
+            try {
+                // Request notification permission
+                const permission = await Notification.requestPermission();
+                if (permission !== 'granted') {
+                    alert('Notification permission is required for fire alerts');
+                    return;
+                }
+                
+                // Get FCM token
+                const token = await messaging.getToken({
+                    vapidKey: 'BMQhfotmIce_250TfjNABeg-l_OPWwe2ghk_BwKL0pmyPVVyEsCiaAHniErBw8pw7RJnMp9kD5oU3DDG1Tlod2k' // Replace with your VAPID key
+                });
+                
+                // Register user
+                const response = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name: name,
+                        phone: phone,
+                        ranch_id: currentUser.ranch_id,
+                        user_id: currentUser.id
+                    })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    alert('🚨 Fire alert sent to all ranch members!');
+                    document.getElementById('alertTitle').value = '';
+                    document.getElementById('alertMessage').value = '';
+                    loadAlerts(); // Refresh alerts
+                } else {
+                    alert('Failed to send alert. Please try again.');
+                }
+            } catch (error) {
+                console.error('Error sending alert:', error);
+                alert('Failed to send alert. Please check your connection.');
+            }
+        }
+        
+        // Request livestock help
+        async function requestLivestockHelp() {
+            // First check if there's an active fire alert
+            try {
+                const alertsResponse = await fetch(`/api/alerts?ranch_id=${currentUser.ranch_id}`);
+                const alerts = await alertsResponse.json();
+                
+                if (alerts.length === 0) {
+                    alert('No active fire alerts. Livestock requests can only be made during active emergencies.');
+                    return;
+                }
+                
+                const animalType = document.getElementById('animalType').value;
+                const animalCount = document.getElementById('animalCount').value;
+                const pickupLocation = document.getElementById('pickupLocation').value;
+                const contactInfo = document.getElementById('contactInfo').value;
+                const notes = document.getElementById('requestNotes').value;
+                
+                if (!animalCount || !pickupLocation || !contactInfo) {
+                    alert('Please fill in all required fields');
+                    return;
+                }
+                
+                const response = await fetch('/api/livestock-requests', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        fire_alert_id: alerts[0].id, // Use the most recent alert
+                        user_id: currentUser.id,
+                        animal_type: animalType,
+                        animal_count: parseInt(animalCount),
+                        pickup_location: pickupLocation,
+                        contact_info: contactInfo,
+                        notes: notes
+                    })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    alert('✅ Livestock help request sent to ranch members!');
+                    // Clear form
+                    document.getElementById('animalCount').value = '1';
+                    document.getElementById('pickupLocation').value = '';
+                    document.getElementById('contactInfo').value = '';
+                    document.getElementById('requestNotes').value = '';
+                    loadLivestockRequests();
+                } else {
+                    alert('Failed to send request. Please try again.');
+                }
+            } catch (error) {
+                console.error('Error requesting livestock help:', error);
+                alert('Failed to send request. Please check your connection.');
+            }
+        }
+        
+        // Load livestock requests
+        async function loadLivestockRequests() {
+            try {
+                const alertsResponse = await fetch(`/api/alerts?ranch_id=${currentUser.ranch_id}`);
+                const alerts = await alertsResponse.json();
+                
+                if (alerts.length === 0) {
+                    document.getElementById('livestockRequests').innerHTML = 
+                        '<div class="card"><p>No livestock requests - no active fire alerts.</p></div>';
+                    return;
+                }
+                
+                const response = await fetch(`/api/livestock-requests?fire_alert_id=${alerts[0].id}`);
+                const requests = await response.json();
+                
+                const container = document.getElementById('livestockRequests');
+                
+                if (requests.length === 0) {
+                    container.innerHTML = '<div class="card"><p>No livestock help requests yet.</p></div>';
+                } else {
+                    container.innerHTML = '<h3>Current Help Requests</h3>' + 
+                        requests.map(req => `
+                            <div class="livestock-request">
+                                <h4>🐄 ${req.animal_count} ${req.animal_type}</h4>
+                                <p><strong>Location:</strong> ${req.pickup_location}</p>
+                                <p><strong>Contact:</strong> ${req.contact_info}</p>
+                                ${req.notes ? `<p><strong>Notes:</strong> ${req.notes}</p>` : ''}
+                                <p><strong>Status:</strong> ${req.status}</p>
+                                <div class="timestamp">
+                                    ${new Date(req.created_at).toLocaleString()}
+                                </div>
+                            </div>
+                        `).join('');
+                }
+            } catch (error) {
+                console.error('Error loading livestock requests:', error);
+            }
+        }
+        
+        // Update connection status
+        function updateConnectionStatus(isOnline) {
+            const statusIndicator = document.getElementById('connectionStatus');
+            const statusText = document.getElementById('connectionText');
+            
+            if (isOnline) {
+                statusIndicator.className = 'status-indicator status-online';
+                statusText.textContent = 'Connected';
+            } else {
+                statusIndicator.className = 'status-indicator status-offline';
+                statusText.textContent = 'Offline';
+            }
+        }
+        
+        // Handle foreground messages
+        messaging.onMessage((payload) => {
+            console.log('Message received in foreground:', payload);
+            
+            // Show notification even when app is open
+            if (payload.notification) {
+                new Notification(payload.notification.title, {
+                    body: payload.notification.body,
+                    icon: '/icon-192.png',
+                    badge: '/badge-72.png'
+                });
+            }
+            
+            // Refresh data based on message type
+            if (payload.data) {
+                if (payload.data.type === 'fire_alert') {
+                    loadAlerts();
+                } else if (payload.data.type === 'livestock_request') {
+                    loadLivestockRequests();
+                }
+            }
+        });
+        
+        // Handle token refresh
+        messaging.onTokenRefresh(() => {
+            messaging.getToken({ vapidKey: 'your-vapid-key' }).then((refreshedToken) => {
+                console.log('Token refreshed:', refreshedToken);
+                
+                // Send the new token to your server
+                if (currentUser) {
+                    fetch('/api/update-token', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            user_id: currentUser.id,
+                            fcm_token: refreshedToken
+                        })
+                    });
+                }
+            });
+        });
+        
+        // Handle network status
+        window.addEventListener('online', () => updateConnectionStatus(true));
+        window.addEventListener('offline', () => updateConnectionStatus(false));
+    </script>
+</body>
+</html> parseInt(ranchId),
+                        fcm_token: token
+                    })
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    currentUser = {
+                        id: result.user_id,
+                        name: name,
+                        ranch_id: parseInt(ranchId)
+                    };
+                    
+                    localStorage.setItem('fireAlertUser', JSON.stringify(currentUser));
+                    showMainApp();
+                } else {
+                    alert('Registration failed. Please try again.');
+                }
+            } catch (error) {
+                console.error('Registration error:', error);
+                alert('Registration failed. Please check your connection.');
+            }
+        }
+        
+        // Show main app
+        function showMainApp() {
+            document.getElementById('registrationForm').classList.add('hidden');
+            document.getElementById('mainApp').classList.remove('hidden');
+            loadAlerts();
+            
+            // Set up periodic refresh
+            setInterval(loadAlerts, 30000); // Refresh every 30 seconds
+        }
+        
+        // Tab navigation
+        function showTab(tabName) {
+            // Hide all tabs
+            document.getElementById('alertsTab').classList.add('hidden');
+            document.getElementById('livestockTab').classList.add('hidden');
+            document.getElementById('adminTab').classList.add('hidden');
+            
+            // Remove active class from all tab buttons
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabName + 'Tab').classList.remove('hidden');
+            
+            // Add active class to clicked tab
+            event.target.classList.add('active');
+            
+            if (tabName === 'livestock') {
+                loadLivestockRequests();
+            }
+        }
+        
+        // Load active alerts
+        async function loadAlerts() {
+            try {
+                const response = await fetch(`/api/alerts?ranch_id=${currentUser.ranch_id}`);
+                const alerts = await response.json();
+                
+                const container = document.getElementById('currentAlerts');
+                const noAlerts = document.getElementById('noAlerts');
+                
+                if (alerts.length === 0) {
+                    container.innerHTML = '';
+                    noAlerts.classList.remove('hidden');
+                } else {
+                    noAlerts.classList.add('hidden');
+                    container.innerHTML = alerts.map(alert => `
+                        <div class="card alert-card ${alert.severity}">
+                            <div class="severity-badge severity-${alert.severity}">${alert.severity}</div>
+                            <h3>${alert.title}</h3>
+                            <p>${alert.message}</p>
+                            <div class="timestamp">
+                                ${new Date(alert.created_at).toLocaleString()}
+                            </div>
+                        </div>
+                    `).join('');
+                }
+                
+                updateConnectionStatus(true);
+            } catch (error) {
+                console.error('Error loading alerts:', error);
+                updateConnectionStatus(false);
+            }
+        }
+        
+        // Send fire alert (admin function)
+        async function sendFireAlert() {
+            const title = document.getElementById('alertTitle').value;
+            const message = document.getElementById('alertMessage').value;
+            const severity = document.getElementById('alertSeverity').value;
+            
+            if (!title || !message) {
+                alert('Please fill in all fields');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/alerts', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        title: title,
+                        message: message,
+                        severity: severity,
+                        ranch_id:
