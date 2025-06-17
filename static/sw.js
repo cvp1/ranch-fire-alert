@@ -1,9 +1,8 @@
-// sw.js - Service Worker for PWA and push notifications
-const CACHE_NAME = 'fire-alert-v1.0.0';
+// sw.js - iPhone-compatible Service Worker
+const CACHE_NAME = 'fire-alert-v1.1.0';
 const urlsToCache = [
     '/',
     '/manifest.json'
-    // Remove the CSS and JS references since they're inline
 ];
 
 // Install event - cache resources
@@ -13,10 +12,13 @@ self.addEventListener('install', (event) => {
         caches.open(CACHE_NAME)
             .then((cache) => {
                 console.log('Cache opened');
-                return cache.addAll(urlsToCache.filter(url => url !== '/'));
-            })
-            .catch((error) => {
-                console.log('Cache failed:', error);
+                // Only cache essential resources that definitely exist
+                return cache.addAll(['/'])
+                    .catch((error) => {
+                        console.log('Cache failed for some resources:', error);
+                        // Don't fail the entire install if some resources can't be cached
+                        return Promise.resolve();
+                    });
             })
     );
     self.skipWaiting();
@@ -44,6 +46,11 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
     // Only handle GET requests
     if (event.request.method !== 'GET') {
+        return;
+    }
+    
+    // Skip cross-origin requests
+    if (!event.request.url.startsWith(self.location.origin)) {
         return;
     }
     
@@ -112,7 +119,11 @@ self.addEventListener('fetch', (event) => {
                         
                         caches.open(CACHE_NAME)
                             .then((cache) => {
-                                cache.put(event.request, responseToCache);
+                                try {
+                                    cache.put(event.request, responseToCache);
+                                } catch (error) {
+                                    console.log('Failed to cache response:', error);
+                                }
                             });
                         
                         return response;
@@ -122,12 +133,18 @@ self.addEventListener('fetch', (event) => {
                         if (event.request.destination === 'document') {
                             return caches.match('/');
                         }
+                        
+                        // For other requests, return a generic offline response
+                        return new Response('Offline', {
+                            status: 503,
+                            statusText: 'Service Unavailable'
+                        });
                     });
             })
     );
 });
 
-// Push notification handling
+// Push notification handling (iOS 16.4+ support)
 self.addEventListener('push', (event) => {
     console.log('Push message received:', event);
     
@@ -135,14 +152,13 @@ self.addEventListener('push', (event) => {
         title: 'Fire Alert',
         body: 'Emergency notification received',
         icon: '/icon-192.png',
-        badge: '/badge-72.png',
+        badge: '/icon-192.png',
         vibrate: [200, 100, 200],
         requireInteraction: true,
         actions: [
             {
                 action: 'open',
-                title: 'Open App',
-                icon: '/icon-192.png'
+                title: 'Open App'
             },
             {
                 action: 'dismiss',
@@ -183,8 +199,7 @@ self.addEventListener('push', (event) => {
                     notificationData.actions = [
                         {
                             action: 'open',
-                            title: 'View Request',
-                            icon: '/icon-192.png'
+                            title: 'View Request'
                         },
                         {
                             action: 'dismiss',
@@ -215,7 +230,7 @@ self.addEventListener('notificationclick', (event) => {
     
     // Open the app
     event.waitUntil(
-        clients.matchAll({ type: 'window' }).then((clientList) => {
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
             // If app is already open, focus it
             for (const client of clientList) {
                 if (client.url.includes(self.location.origin) && 'focus' in client) {
@@ -248,7 +263,6 @@ self.addEventListener('sync', (event) => {
     
     if (event.tag === 'background-sync') {
         event.waitUntil(
-            // Attempt to sync any pending actions when connection is restored
             syncPendingActions()
         );
     }
@@ -257,12 +271,6 @@ self.addEventListener('sync', (event) => {
 // Sync pending actions when coming back online
 async function syncPendingActions() {
     try {
-        // Check if there are any pending actions stored in IndexedDB
-        // This would be where you'd sync any offline actions like:
-        // - Livestock requests made while offline
-        // - Alert acknowledgments
-        // - User updates
-        
         console.log('Syncing pending actions...');
         
         // Notify all clients that sync is complete
@@ -287,22 +295,13 @@ self.addEventListener('message', (event) => {
     }
 });
 
-// Periodic background sync for critical updates
-self.addEventListener('periodicsync', (event) => {
-    if (event.tag === 'check-fire-alerts') {
-        event.waitUntil(
-            // Check for new fire alerts periodically
-            checkForCriticalAlerts()
-        );
-    }
+// Handle errors gracefully
+self.addEventListener('error', (event) => {
+    console.error('Service Worker error:', event.error);
 });
 
-async function checkForCriticalAlerts() {
-    try {
-        // This would check for new critical alerts
-        // and show notifications if needed
-        console.log('Checking for critical fire alerts...');
-    } catch (error) {
-        console.error('Error checking for critical alerts:', error);
-    }
-}
+self.addEventListener('unhandledrejection', (event) => {
+    console.error('Service Worker unhandled rejection:', event.reason);
+});
+
+console.log('Service Worker loaded - iPhone compatible version');

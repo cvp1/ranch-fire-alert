@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  # Main Flask application
+  web:
+    build: .
+    ports:
+      - "8088:8088"
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=false
+      - SECRET_KEY=docker-dev-secret-key-change-in-production
+      - DATABASE_URL=postgresql://ranch_user:ranch_password@db:5432/ranch_alerts
+      - HOST=0.0.0.0
+      - PORT=8088
+    env_file:
+      - .env
+    volumes:
+      # Mount source code for development (comment out for production)
+      - .:/app
+      # Mount persistent storage for SQLite (if using SQLite instead of PostgreSQL)
+      - app_data:/app/data
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+    networks:
+      - ranch_network
+
+  # PostgreSQL database
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=ranch_alerts
+      - POSTGRES_USER=ranch_user
+      - POSTGRES_PASSWORD=ranch_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    networks:
+      - ranch_network
+
+  # Redis for caching and sessions
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    networks:
+      - ranch_network
+
+  # Nginx reverse proxy (optional, for production)
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - web
+    restart: unless-stopped
+    networks:
+      - ranch_network
+    profiles:
+      - production
+
+volumes:
+  postgres_data:
+  redis_data:
+  app_data:
+
+networks:
+  ranch_network:
+    driver: bridge
