@@ -1,6 +1,6 @@
-# 🔥 Ranch Fire Alert PWA
+# 🔥 Dragoon Mountain Ranch Fire Alert PWA
 
-A Progressive Web App (PWA) emergency notification system designed for rural ranch communities to coordinate fire alerts and livestock evacuation during emergencies.
+A Progressive Web App (PWA) emergency notification system designed specifically for the Dragoon Mountain Ranch community to coordinate fire alerts and livestock evacuation during emergencies.
 
 ## 🚨 Features
 
@@ -8,13 +8,19 @@ A Progressive Web App (PWA) emergency notification system designed for rural ran
 - **Real-time fire alerts** with severity levels (Low, Medium, High, Critical)
 - **Push notifications** that work even when the app is closed
 - **Offline capability** - app works without internet connection
-- **Ranch-specific alerts** - only receive notifications for your area
+- **Community-wide alerts** for the Dragoon Mountain Ranch area
 
 ### Livestock Coordination
 - **Request livestock help** during emergencies
 - **Coordinate evacuations** with neighboring ranchers
 - **Track help requests** and status updates
-- **Animal-specific details** (cattle, horses, sheep, etc.)
+- **Animal-specific details** (cattle, horses, sheep, goats, pigs, etc.)
+
+### User Management
+- **Smart login/registration** - enter email or phone to get started
+- **Optional password protection** for enhanced security
+- **Admin controls** for ranch coordinators
+- **User-friendly interface** optimized for mobile and desktop
 
 ### Modern PWA Features
 - **Install on mobile** - works like a native app
@@ -24,171 +30,261 @@ A Progressive Web App (PWA) emergency notification system designed for rural ran
 
 ## 🛠️ Technology Stack
 
-- **Backend**: Python Flask with SQLAlchemy
+- **Backend**: Python Flask with SQLAlchemy 2.0+
 - **Frontend**: Vanilla JavaScript with PWA features
 - **Database**: SQLite (development) / PostgreSQL (production)
 - **Push Notifications**: Firebase Cloud Messaging (FCM)
 - **Caching**: Service Worker with Cache API
+- **Authentication**: Simple email/phone-based system with optional passwords
 
-## 📱 Screenshots
+## 🏔️ Ranch Configuration
 
-*Note: Add screenshots of the app in action*
+The system is configured specifically for:
+- **Ranch**: Dragoon Mountain Ranch
+- **Location**: 31.9190°N, 109.9673°W (Arizona)
+- **Coverage Area**: 10-mile radius
+- **Default Admin**: `admin@ranch.local` / `admin123`
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 - Python 3.8+
-- Firebase project for push notifications
-- SSL certificate (required for PWA features)
+- Docker (optional, but recommended)
+- Firebase project for push notifications (optional)
 
-### Installation
+### Option 1: Docker Setup (Recommended)
 
-1. **Clone the repository**
+1. **Clone and start with Docker**:
+   ```bash
+   git clone https://github.com/yourusername/ranch-fire-alert.git
+   cd ranch-fire-alert
+   docker-compose up -d
+   ```
+
+2. **Visit the application**:
+   - Desktop: http://localhost:8088
+   - Mobile: http://YOUR_IP:8088
+
+### Option 2: Local Development
+
+1. **Clone the repository**:
    ```bash
    git clone https://github.com/yourusername/ranch-fire-alert.git
    cd ranch-fire-alert
    ```
 
-2. **Set up Python environment**
+2. **Set up Python environment**:
    ```bash
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    pip install -r requirements.txt
    ```
 
-3. **Create directory structure**
+3. **Create required directories**:
    ```bash
    mkdir templates static static/icons
    ```
 
-4. **Move application files**
+4. **Add the application files**:
    - Save `app.py` in the root directory
    - Save HTML content as `templates/index.html`
    - Save service worker as `static/sw.js`
+   - Save Firebase service worker as `static/firebase-messaging-sw.js`
    - Save manifest as `static/manifest.json`
 
-5. **Firebase setup**
-   - Create a Firebase project at [Firebase Console](https://console.firebase.google.com/)
-   - Enable Cloud Messaging
-   - Download service account key as `firebase-key.json`
-   - Get your VAPID key from Project Settings > Cloud Messaging
-   - Update Firebase configuration in the HTML file
-
-6. **Create app icons**
-   Create fire/alert themed icons in `static/icons/`:
+5. **Create app icons** (place in `static/icons/`):
    - icon-72.png (72x72)
    - icon-192.png (192x192)
    - icon-512.png (512x512)
 
-7. **Run the application**
+6. **Run the application**:
    ```bash
    python app.py
    ```
-   Visit: http://localhost:5000
+
+7. **Visit**: http://localhost:8088
 
 ## 🔧 Configuration
 
-### Firebase Configuration
-
-Replace the placeholder values in `templates/index.html`:
-
-```javascript
-const firebaseConfig = {
-    apiKey: "your-actual-api-key",
-    authDomain: "your-project.firebaseapp.com",
-    projectId: "your-actual-project-id",
-    storageBucket: "your-project.appspot.com",
-    messagingSenderId: "your-sender-id",
-    appId: "your-app-id"
-};
-```
-
-Add your VAPID key:
-```javascript
-vapidKey: 'your-vapid-key-here'
-```
-
-### Environment Variables
-
-Create a `.env` file:
-```env
-FLASK_APP=app.py
-FLASK_ENV=development
-SECRET_KEY=your-secret-key-here
-DATABASE_URL=sqlite:///fire_alerts.db
-```
-
-## 📊 Database Schema
-
-The application automatically creates these tables:
-
-- **Ranch**: Ranch locations and coverage areas
-- **User**: Registered users with FCM tokens
-- **FireAlert**: Active fire alerts with severity levels
-- **LivestockRequest**: Help requests during emergencies
-
-## 🌐 Production Deployment
-
-### SSL Certificate (Required)
-PWAs require HTTPS. Options include:
-
-1. **Development**: Use ngrok
-   ```bash
-   pip install pyngrok
-   python -c "from pyngrok import ngrok; print(ngrok.connect(5000))"
-   ```
-
-2. **Production**: Use Let's Encrypt, Cloudflare, or your hosting provider
-
-### Production Server
+### Environment Variables (.env)
 ```bash
-gunicorn --bind 0.0.0.0:443 --certfile=cert.pem --keyfile=key.pem app:app
+# Flask Configuration
+FLASK_ENV=development
+FLASK_DEBUG=false
+SECRET_KEY=your-secret-key-here
+HOST=0.0.0.0
+PORT=8088
+
+# Database
+DATABASE_URL=sqlite:///fire_alerts.db
+# For production: DATABASE_URL=postgresql://user:pass@host:5432/db
+
+# Firebase (Optional - for push notifications)
+FIREBASE_API_KEY=your-api-key
+FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+FIREBASE_PROJECT_ID=your-project-id
+FIREBASE_STORAGE_BUCKET=your-project.appspot.com
+FIREBASE_MESSAGING_SENDER_ID=123456789
+FIREBASE_APP_ID=your-app-id
+FIREBASE_VAPID_KEY=your-vapid-key
 ```
 
-## 🧪 Testing
+### Firebase Setup (Optional)
 
-1. Register a user on the PWA
-2. Use the admin tab to send a test alert
-3. Test notifications with app in background/foreground
-4. Verify offline functionality by disconnecting internet
-5. Test on multiple devices and browsers
+For push notifications:
 
-## 🎯 Use Cases
+1. **Create Firebase Project**:
+   - Go to [Firebase Console](https://console.firebase.google.com/)
+   - Create new project
+   - Enable Cloud Messaging
 
-### Perfect for:
-- **Rural ranch communities** needing reliable emergency communication
-- **Replacing SMS text trees** with modern push notifications
-- **Coordinating livestock evacuations** during wildfires
-- **Emergency preparedness** for agricultural communities
+2. **Get Configuration**:
+   - Project Settings > General: Copy web app config
+   - Project Settings > Service Accounts: Generate private key → `firebase-key.json`
+   - Project Settings > Cloud Messaging: Copy VAPID key
 
-### Benefits over traditional methods:
-- ✅ **Free push notifications** (no SMS costs)
-- ✅ **Rich content** (images, maps, detailed information)
-- ✅ **Two-way communication** capabilities
-- ✅ **Offline functionality** when cell towers are down
-- ✅ **Instant updates** to all community members
-- ✅ **Better coordination tools** for emergency response
+3. **Update .env file** with your Firebase values
 
-## 🔒 Security Considerations
+## 📁 Project Structure
 
-For production use, implement:
+```
+ranch-fire-alert/
+├── app.py                          # Main Flask application
+├── requirements.txt                # Python dependencies
+├── .env                           # Environment configuration
+├── docker-compose.yml             # Docker configuration
+├── templates/
+│   └── index.html                 # Main application UI
+├── static/
+│   ├── sw.js                      # Service Worker
+│   ├── firebase-messaging-sw.js   # Firebase Service Worker
+│   ├── manifest.json              # PWA manifest
+│   └── icons/                     # App icons
+│       ├── icon-72.png
+│       ├── icon-192.png
+│       └── icon-512.png
+├── firebase-key.json              # Firebase service account (optional)
+└── fire_alerts.db                 # SQLite database (auto-created)
+```
 
-- User authentication and authorization
-- Input validation and sanitization
-- Rate limiting for API endpoints
-- Environment variables for all secrets
-- Database access controls
+## 👥 User Guide
+
+### Getting Started
+1. **Visit the app** on your device
+2. **Enter your email or phone** to get started
+3. **Create account** for Dragoon Mountain Ranch
+4. **Set optional password** for added security
+5. **Install the app** when prompted (mobile/desktop)
+
+### For Ranch Members
+- **View fire alerts** in real-time
+- **Request livestock help** during emergencies
+- **Offer help** to neighbors in need
+- **Receive push notifications** for critical alerts
+
+### For Ranch Coordinators (Admins)
+- **Send fire alerts** to the community
+- **Manage alert severity** levels
+- **View system statistics**
+- **Coordinate emergency response**
+
+## 🚀 Production Deployment
+
+### Docker Production
+```bash
+# Use production profile
+docker-compose --profile production up -d
+```
+
+### Cloud Platforms
+1. **Railway**: Connect GitHub repo, auto-deploys
+2. **Heroku**: `git push heroku main`
+3. **DigitalOcean**: App Platform supports Flask
+4. **Render**: Connect GitHub, auto-deploy
+
+### Production Checklist
+- [ ] HTTPS enabled (required for PWA features)
+- [ ] PostgreSQL database configured
+- [ ] Firebase notifications configured
+- [ ] Environment variables set
+- [ ] SSL certificates installed
+- [ ] Performance monitoring enabled
+
+## 🔒 Security Notes
+
+This system includes:
+- ✅ Simple email/phone authentication
+- ✅ Optional password protection
+- ✅ SQLAlchemy 2.0+ with proper query syntax
+- ✅ Input validation and error handling
+- ✅ HTTPS support for production
+
+For production use, consider adding:
+- Rate limiting
+- Enhanced password hashing (bcrypt)
+- Session management
 - CSRF protection
+- Input sanitization
 
-## 🚀 Future Enhancements
+## 🆘 Troubleshooting
 
-- [ ] Integration with weather APIs for fire risk assessment
-- [ ] GPS tracking for livestock and evacuation routes
-- [ ] Integration with emergency services (911, local fire departments)
-- [ ] Multi-language support
-- [ ] Voice notifications for accessibility
-- [ ] Mapping integration for visual fire tracking
-- [ ] Analytics dashboard for ranch administrators
+### Common Issues
+
+**Database Errors**:
+```bash
+# Reset database (loses data)
+rm fire_alerts.db
+python app.py
+```
+
+**Firebase Errors**:
+- Check Firebase configuration in .env
+- Ensure `firebase-messaging-sw.js` exists in `/static/`
+- Verify VAPID key is correct
+
+**Docker Issues**:
+```bash
+# Restart services
+docker-compose restart
+
+# View logs
+docker-compose logs -f web
+
+# Reset everything
+docker-compose down -v && docker-compose up -d
+```
+
+**Port Conflicts**:
+- Change `PORT=8088` in .env file
+
+### Development Mode
+
+For HTTP development (no PWA features):
+- Notifications won't work without HTTPS
+- PWA install prompt won't appear
+- Service Worker features limited
+
+### Production Mode
+
+For full PWA features:
+- HTTPS required
+- Valid SSL certificate needed
+- Firebase configuration required for notifications
+
+## 📊 System Requirements
+
+### Minimum Requirements
+- **Server**: 1 CPU, 512MB RAM
+- **Database**: SQLite (development) or PostgreSQL (production)
+- **Network**: HTTP/HTTPS access
+- **Browser**: Modern browser with Service Worker support
+
+### Recommended for Production
+- **Server**: 2 CPU, 2GB RAM
+- **Database**: PostgreSQL with backups
+- **Network**: HTTPS with valid SSL certificate
+- **CDN**: For static asset delivery
+- **Monitoring**: Application and database monitoring
 
 ## 🤝 Contributing
 
@@ -202,20 +298,36 @@ For production use, implement:
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
+## 📞 Emergency Use Disclaimer
+
+⚠️ **Important**: This app is designed to supplement, not replace, official emergency communication channels. Always follow local emergency services guidance and have backup communication methods available.
+
+For actual emergencies, call 911 immediately.
+
 ## 🆘 Support
 
 If you encounter issues:
 
-1. Check the troubleshooting section in the setup guide
-2. Verify Firebase configuration and VAPID keys
-3. Ensure HTTPS is properly configured
-4. Check browser console for JavaScript errors
+1. Check the troubleshooting section above
+2. Verify your configuration files
+3. Check browser console for JavaScript errors
+4. Review server logs for backend errors
 5. Open an issue on GitHub with detailed error information
 
-## 📞 Emergency Use Disclaimer
-
-This app is designed to supplement, not replace, official emergency communication channels. Always follow local emergency services guidance and have backup communication methods available.
+### Admin Access
+- **Email**: admin@ranch.local
+- **Password**: admin123
+- **Features**: Send alerts, view statistics, manage system
 
 ---
 
-**Built with ❤️ for rural communities and ranch safety**
+**Built with ❤️ for the Dragoon Mountain Ranch community and rural ranch safety**
+
+### Recent Updates
+- ✅ Simplified to single ranch (Dragoon Mountain Ranch)
+- ✅ Enhanced user authentication system
+- ✅ Fixed SQLAlchemy 2.0+ compatibility
+- ✅ Added Firebase service worker support
+- ✅ Improved error handling and validation
+- ✅ Added Docker support for easy deployment
+- ✅ Enhanced livestock coordination features

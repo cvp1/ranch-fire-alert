@@ -6,9 +6,10 @@
     <title>Ranch Fire Alert System</title>
     
     <!-- PWA Meta Tags -->
-    <link rel="manifest" href="/manifest.json">
+    <link rel="manifest" href="/static/manifest.json">
     <meta name="theme-color" content="#d32f2f">
-    <link rel="icon" href="/favicon.ico">
+    <link rel="icon" href="/static/icons/icon-192.png">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Fire Alert">
@@ -115,14 +116,14 @@
             background: #d32f2f;
             color: white;
             border: none;
-            padding: 15px 20px;
+            padding: 12px 20px;
             border-radius: 8px;
             font-size: 16px;
             cursor: pointer;
             width: 100%;
             margin-bottom: 10px;
             font-weight: 500;
-            transition: background 0.2s;
+            transition: background 0.3s ease;
         }
         
         .btn:hover {
@@ -150,15 +151,12 @@
             background: #2e7d32;
         }
         
-        .btn-outline {
-            background: transparent;
-            color: #d32f2f;
-            border: 2px solid #d32f2f;
+        .btn-danger {
+            background: #d32f2f;
         }
         
-        .btn-outline:hover {
-            background: #d32f2f;
-            color: white;
+        .btn-danger:hover {
+            background: #b71c1c;
         }
         
         .form-group {
@@ -239,6 +237,7 @@
             border: none;
             font-size: 13px;
             font-weight: 500;
+            transition: all 0.3s ease;
         }
         
         .tab.active {
@@ -340,241 +339,510 @@
             margin-bottom: 20px;
             text-align: center;
         }
+        
+        .admin-alert-actions {
+            margin-top: 15px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        
+        .admin-alert-actions .btn {
+            flex: 1;
+            padding: 8px;
+            font-size: 12px;
+            margin-bottom: 0;
+        }
+        
+        .logout-section {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        .alert-stats {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+        
+        .stat-item {
+            text-align: center;
+        }
+        
+        .stat-number {
+            display: block;
+            font-size: 20px;
+            font-weight: bold;
+            color: #d32f2f;
+        }
     </style>
 </head>
 <body>
     <div class="container">
+        <!-- Header -->
         <div class="header">
             <h1>🔥 Ranch Fire Alert</h1>
-            <p>Emergency notification system</p>
-            <div>
-                <span class="status-indicator" id="connectionStatus"></span>
-                <span id="connectionText">Connecting...</span>
-            </div>
+            <p>Emergency Communication System</p>
         </div>
-        
-        <!-- Install Prompt (hidden by default) -->
-        <div id="installPrompt" class="install-prompt hidden">
-            <p>📱 Install this app on your phone for instant fire alerts!</p>
-            <button class="btn btn-success" onclick="installApp()">Install App</button>
-        </div>
-        
-        <!-- Error/Success Display -->
+
+        <!-- Error/Success Messages -->
         <div id="errorDisplay" class="error-message hidden">
-            <strong>Error:</strong> <span id="errorMessage"></span>
+            <span id="errorMessage"></span>
         </div>
         
         <div id="successDisplay" class="success-message hidden">
             <span id="successMessage"></span>
         </div>
-        
+
+        <!-- Install Prompt (PWA) -->
+        <div id="installPrompt" class="install-prompt hidden">
+            <p><strong>📱 Install this app</strong></p>
+            <p>Add to your home screen for quick access and offline use</p>
+            <button class="btn btn-success" onclick="installPWA()">Install App</button>
+        </div>
+
+        <!-- Connection Status -->
+        <div class="card">
+            <p>
+                <span id="connectionStatus" class="status-indicator status-offline"></span>
+                <span id="connectionText">Checking connection...</span>
+            </p>
+        </div>
+
         <!-- User Check Form -->
         <div id="userCheckForm" class="card">
-            <h2>Welcome to Ranch Fire Alert</h2>
-            <p style="margin-bottom: 20px; color: #666;">Enter your email or phone number to get started.</p>
+            <h2>Get Started</h2>
+            <p style="margin-bottom: 15px;">Enter your email or phone number to continue:</p>
             
             <div class="form-group">
-                <label>Email or Phone Number</label>
-                <input type="text" id="userIdentifier" placeholder="your@email.com or (555) 123-4567" required>
+                <input type="text" id="userIdentifier" placeholder="Email or phone number" autocomplete="username">
             </div>
             
-            <button class="btn" onclick="checkUser()">
-                <span id="checkUserBtn">Continue</span>
-                <span id="checkUserLoading" class="loading hidden"></span>
-            </button>
+            <button class="btn" onclick="checkUser()" id="checkUserBtn">Continue</button>
+            <div class="loading hidden" id="checkUserLoading"></div>
         </div>
-        
+
         <!-- Login Form -->
         <div id="loginForm" class="card hidden">
-            <h2>Welcome Back!</h2>
+            <h2>Welcome Back</h2>
+            
             <div id="existingUserInfo" class="user-info"></div>
             
             <div class="form-group">
-                <label>Password</label>
-                <input type="password" id="loginPassword" placeholder="Enter your password" required>
+                <label for="loginPassword">Password (optional):</label>
+                <input type="password" id="loginPassword" placeholder="Enter password or leave blank">
             </div>
             
-            <button class="btn" onclick="loginUser()">
-                <span id="loginBtn">Sign In</span>
-                <span id="loginLoading" class="loading hidden"></span>
-            </button>
+            <button class="btn" onclick="login()" id="loginBtn">Sign In</button>
+            <div class="loading hidden" id="loginLoading"></div>
             
             <div class="auth-toggle">
-                <a href="#" class="text-link" onclick="showUserCheck()">← Back to start</a>
+                <span class="text-link" onclick="showUserCheck()">← Back</span>
             </div>
         </div>
-        
+
         <!-- Registration Form -->
         <div id="registrationForm" class="card hidden">
-            <h2 id="registrationTitle">Create Your Account</h2>
-            <p id="registrationSubtitle" style="margin-bottom: 20px; color: #666;">Join your ranch community for emergency alerts.</p>
+            <h2>Join the Alert System</h2>
             
             <div class="form-group">
-                <label>Your Full Name</label>
-                <input type="text" id="userName" placeholder="Enter your name" required>
+                <label for="regName">Full Name *</label>
+                <input type="text" id="regName" placeholder="Your full name" required>
             </div>
             
             <div class="form-group">
-                <label>Email Address</label>
-                <input type="email" id="userEmail" placeholder="your@email.com">
+                <label for="regEmail">Email</label>
+                <input type="email" id="regEmail" placeholder="your@email.com">
             </div>
             
             <div class="form-group">
-                <label>Phone Number</label>
-                <input type="tel" id="userPhone" placeholder="(555) 123-4567">
+                <label for="regPhone">Phone Number</label>
+                <input type="tel" id="regPhone" placeholder="(555) 123-4567">
             </div>
             
             <div class="form-group">
-                <label>Create Password (Optional)</label>
-                <input type="password" id="userPassword" placeholder="Leave blank for passwordless access">
-                <small style="color: #666; font-size: 12px;">Password is optional. You can always sign in with just your email/phone.</small>
+                <label for="regPassword">Password (optional)</label>
+                <input type="password" id="regPassword" placeholder="Create a password">
+                <small style="color: #666;">Leave blank for passwordless access</small>
             </div>
             
             <div class="form-group">
-                <label>Select Your Ranch</label>
-                <select id="ranchSelect" required>
+                <label for="regRanch">Select Ranch *</label>
+                <select id="regRanch" required>
                     <option value="">Choose your ranch...</option>
                 </select>
             </div>
             
-            <button class="btn" onclick="registerUser()">
-                <span id="registerBtn">Create Account & Enable Alerts</span>
-                <span id="registerLoading" class="loading hidden"></span>
-            </button>
+            <button class="btn" onclick="register()" id="registerBtn">Join Alert System</button>
+            <div class="loading hidden" id="registerLoading"></div>
             
             <div class="auth-toggle">
-                <a href="#" class="text-link" onclick="showUserCheck()">← Back to start</a>
+                <span class="text-link" onclick="showUserCheck()">← Back</span>
             </div>
         </div>
-        
-        <!-- Main App -->
+
+        <!-- Main Application -->
         <div id="mainApp" class="hidden">
-            <!-- User Info Bar -->
-            <div class="user-info">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <div>
-                        <h3 id="currentUserName">Welcome!</h3>
-                        <small id="currentUserDetails"></small>
-                    </div>
-                    <button class="btn-outline" style="padding: 8px 12px; font-size: 12px;" onclick="logoutUser()">Logout</button>
+            <!-- User Info -->
+            <div class="card">
+                <div class="user-info">
+                    <h3 id="userName"></h3>
+                    <p id="userDetails"></p>
                 </div>
             </div>
-            
+
+            <!-- Tab Navigation -->
             <div class="tabs">
                 <button class="tab active" onclick="showTab('alerts')">🔥 Alerts</button>
                 <button class="tab" onclick="showTab('livestock')">🐄 Livestock</button>
-                <button class="tab" onclick="showTab('admin')">⚙️ Admin</button>
+                <button class="tab" onclick="showTab('admin')" id="adminTabBtn" style="display:none;">⚙️ Admin</button>
             </div>
-            
+
             <!-- Alerts Tab -->
             <div id="alertsTab">
-                <div id="currentAlerts"></div>
-                <div id="noAlerts" class="card" style="text-align: center;">
-                    <h3>🟢 All Clear</h3>
-                    <p>No active fire alerts in your area.</p>
+                <div class="card">
+                    <div class="alert-stats">
+                        <div class="stat-item">
+                            <span class="stat-number" id="totalAlerts">0</span>
+                            <span>Total Alerts</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number" id="activeAlerts">0</span>
+                            <span>Active</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number" id="criticalAlerts">0</span>
+                            <span>Critical</span>
+                        </div>
+                    </div>
+                    <button class="btn" onclick="loadAlerts()">🔄 Refresh Alerts</button>
                 </div>
+                
+                <div id="alertsList"></div>
             </div>
-            
+
             <!-- Livestock Tab -->
             <div id="livestockTab" class="hidden">
                 <div class="card">
-                    <h3>Request Livestock Help</h3>
+                    <h3>🐄 Request Livestock Help</h3>
+                    
                     <div class="form-group">
-                        <label>Animal Type</label>
+                        <label for="animalType">Animal Type</label>
                         <select id="animalType">
                             <option value="cattle">Cattle</option>
                             <option value="horses">Horses</option>
                             <option value="sheep">Sheep</option>
                             <option value="goats">Goats</option>
                             <option value="pigs">Pigs</option>
-                            <option value="chickens">Chickens</option>
                             <option value="other">Other</option>
                         </select>
                     </div>
+                    
                     <div class="form-group">
-                        <label>Number of Animals</label>
-                        <input type="number" id="animalCount" min="1" value="1">
+                        <label for="animalCount">Number of Animals</label>
+                        <input type="number" id="animalCount" min="1" placeholder="e.g. 25">
                     </div>
+                    
                     <div class="form-group">
-                        <label>Pickup Location</label>
-                        <input type="text" id="pickupLocation" placeholder="Address or description">
+                        <label for="urgencyLevel">Urgency Level</label>
+                        <select id="urgencyLevel">
+                            <option value="low">Low - Planning ahead</option>
+                            <option value="medium">Medium - Need help today</option>
+                            <option value="high">High - Need help now</option>
+                            <option value="critical">Critical - Emergency</option>
+                        </select>
                     </div>
+                    
                     <div class="form-group">
-                        <label>Your Contact Info</label>
-                        <input type="text" id="contactInfo" placeholder="Phone number or other contact">
+                        <label for="helpDetails">Details</label>
+                        <textarea id="helpDetails" placeholder="Describe what help you need (transportation, temporary housing, etc.)"></textarea>
                     </div>
-                    <div class="form-group">
-                        <label>Additional Notes</label>
-                        <textarea id="requestNotes" placeholder="Any special instructions..."></textarea>
-                    </div>
-                    <button class="btn" onclick="requestLivestockHelp()">Send Help Request</button>
+                    
+                    <button class="btn" onclick="requestLivestockHelp()">Request Help</button>
                 </div>
                 
-                <div id="livestockRequests"></div>
+                <div id="livestockRequestsList"></div>
             </div>
-            
+
             <!-- Admin Tab -->
             <div id="adminTab" class="hidden">
                 <div class="card">
-                    <h3>Send Fire Alert</h3>
+                    <h3>🚨 Send Fire Alert</h3>
+                    
                     <div class="form-group">
-                        <label>Alert Title</label>
-                        <input type="text" id="alertTitle" placeholder="Fire near North Pasture">
+                        <label for="alertTitle">Alert Title</label>
+                        <input type="text" id="alertTitle" placeholder="e.g. Wildfire Alert - Highway 89">
                     </div>
+                    
                     <div class="form-group">
-                        <label>Severity Level</label>
+                        <label for="alertMessage">Alert Message</label>
+                        <textarea id="alertMessage" placeholder="Provide detailed information about the fire alert..."></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="alertSeverity">Severity Level</label>
                         <select id="alertSeverity">
-                            <option value="low">Low - Monitor</option>
-                            <option value="medium" selected>Medium - Prepare</option>
-                            <option value="high">High - Evacuate Livestock</option>
-                            <option value="critical">Critical - Immediate Evacuation</option>
+                            <option value="low">🟡 Low - Informational</option>
+                            <option value="medium">🟠 Medium - Caution advised</option>
+                            <option value="high">🔴 High - Immediate action recommended</option>
+                            <option value="critical">⚫ Critical - Emergency evacuation</option>
                         </select>
                     </div>
+                    
                     <div class="form-group">
-                        <label>Message</label>
-                        <textarea id="alertMessage" placeholder="Describe the fire location, wind direction, and recommended actions..."></textarea>
+                        <label for="targetRanch">Target Ranch</label>
+                        <select id="targetRanch">
+                            <option value="all">All Ranches</option>
+                        </select>
                     </div>
-                    <button class="btn" onclick="sendFireAlert()">🚨 Send Alert to Ranch</button>
+                    
+                    <button class="btn" onclick="sendAlert()">Send Fire Alert</button>
                 </div>
+                
+                <div class="card">
+                    <h3>📊 System Statistics</h3>
+                    <div id="adminStats">
+                        <p>Loading statistics...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Logout -->
+            <div class="logout-section">
+                <button class="btn btn-secondary" onclick="logout()">Sign Out</button>
             </div>
         </div>
     </div>
 
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js"></script>
-    
+    <!-- Firebase SDK v9 (modular) -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js';
+        import { getMessaging, getToken, onMessage } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-messaging.js';
+        
+        // Make Firebase available globally
+        window.firebaseApp = null;
+        window.firebaseMessaging = null;
+        window.initializeFirebaseApp = function(config) {
+            try {
+                window.firebaseApp = initializeApp(config.firebase);
+                window.firebaseMessaging = getMessaging(window.firebaseApp);
+                console.log('Firebase initialized successfully');
+                return true;
+            } catch (error) {
+                console.error('Firebase initialization failed:', error);
+                return false;
+            }
+        };
+        
+        window.getFirebaseToken = async function(vapidKey) {
+            if (!window.firebaseMessaging) return null;
+            try {
+                const permission = await Notification.requestPermission();
+                if (permission === 'granted') {
+                    const token = await getToken(window.firebaseMessaging, { vapidKey });
+                    console.log('FCM Token:', token);
+                    return token;
+                } else {
+                    console.log('Notification permission denied');
+                    return null;
+                }
+            } catch (error) {
+                console.error('Error getting Firebase token:', error);
+                return null;
+            }
+        };
+        
+        window.setupFirebaseMessaging = function(onMessageCallback) {
+            if (!window.firebaseMessaging) return;
+            
+            onMessage(window.firebaseMessaging, (payload) => {
+                console.log('Message received in foreground:', payload);
+                if (onMessageCallback) {
+                    onMessageCallback(payload);
+                }
+            });
+        };
+    </script>
+
     <script>
-        // Global app state
+        // Global variables
         let currentUser = null;
-        let appConfig = null;
-        let currentUserData = null;
         let deferredPrompt = null;
-        let messaging = null;
-        
-        // PWA Install handling
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            deferredPrompt = e;
-            document.getElementById('installPrompt').classList.remove('hidden');
+        let swRegistration = null;
+
+        // Initialize app when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            checkConnection();
+            setupPWA();
+            loadConfig();
+            showUserCheck();
+            
+            // Set up periodic tasks
+            setInterval(checkConnection, 10000);
         });
-        
-        function installApp() {
-            if (deferredPrompt) {
-                deferredPrompt.prompt();
-                deferredPrompt.userChoice.then((choiceResult) => {
-                    if (choiceResult.outcome === 'accepted') {
-                        document.getElementById('installPrompt').classList.add('hidden');
-                    }
-                    deferredPrompt = null;
-                });
+
+        // Load configuration from backend
+        async function loadConfig() {
+            try {
+                const response = await fetch('/api/config');
+                const config = await response.json();
+                
+                if (config.firebase && config.firebase.apiKey !== 'demo-api-key') {
+                    initializeFirebase(config);
+                } else {
+                    console.log('Firebase configuration not available - PWA features limited');
+                }
+            } catch (error) {
+                console.error('Error loading config:', error);
             }
         }
-        
-        // Error and success handling
-        function showError(message) {
-            console.error('App Error:', message);
+
+        // Initialize Firebase
+        function initializeFirebase(config) {
+            try {
+                if (window.initializeFirebaseApp && window.initializeFirebaseApp(config)) {
+                    
+                    if ('serviceWorker' in navigator) {
+                        // Register both service workers
+                        Promise.all([
+                            navigator.serviceWorker.register('/static/sw.js'),
+                            navigator.serviceWorker.register('/firebase-messaging-sw.js')
+                        ]).then(([swReg, firebaseReg]) => {
+                            swRegistration = swReg;
+                            console.log('Service Workers registered successfully');
+                            setupMessaging(config.vapidKey);
+                        }).catch(error => {
+                            console.error('Service Worker registration failed:', error);
+                            // Continue without service workers
+                            setupMessaging(config.vapidKey);
+                        });
+                    } else {
+                        setupMessaging(config.vapidKey);
+                    }
+                } else {
+                    console.log('Firebase initialization failed');
+                }
+            } catch (error) {
+                console.error('Firebase initialization error:', error);
+            }
+        }
+
+        // Set up Firebase messaging
+        function setupMessaging(vapidKey) {
+            if (!window.firebaseMessaging || !window.setupFirebaseMessaging) return;
             
+            // Handle foreground messages
+            window.setupFirebaseMessaging((payload) => {
+                const notificationTitle = payload.notification?.title || 'Fire Alert';
+                const notificationOptions = {
+                    body: payload.notification?.body || 'New alert received',
+                    icon: '/static/icons/icon-192.png',
+                    badge: '/static/icons/icon-72.png',
+                    tag: 'fire-alert',
+                    requireInteraction: true
+                };
+                
+                if (swRegistration) {
+                    swRegistration.showNotification(notificationTitle, notificationOptions);
+                }
+                
+                // Refresh alerts if we're on the alerts tab
+                if (!document.getElementById('alertsTab').classList.contains('hidden')) {
+                    loadAlerts();
+                }
+            });
+        }
+
+        // Request notification permission and get token
+        async function requestNotificationPermission() {
+            if (!window.getFirebaseToken) {
+                console.log('Firebase not available - skipping notification setup');
+                return null;
+            }
+            
+            try {
+                // Load config to get VAPID key
+                const response = await fetch('/api/config');
+                const config = await response.json();
+                
+                if (config.vapidKey && config.vapidKey !== 'demo-vapid-key') {
+                    return await window.getFirebaseToken(config.vapidKey);
+                } else {
+                    console.log('VAPID key not configured - skipping notifications');
+                    return null;
+                }
+            } catch (error) {
+                console.error('Error setting up notifications:', error);
+                return null;
+            }
+        }
+
+        // PWA Installation
+        function setupPWA() {
+            // Listen for beforeinstallprompt event
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                deferredPrompt = e;
+                
+                // Show install prompt
+                const installPrompt = document.getElementById('installPrompt');
+                if (installPrompt) {
+                    installPrompt.classList.remove('hidden');
+                }
+            });
+            
+            // Handle app installed event
+            window.addEventListener('appinstalled', (e) => {
+                console.log('PWA was installed');
+                const installPrompt = document.getElementById('installPrompt');
+                if (installPrompt) {
+                    installPrompt.classList.add('hidden');
+                }
+            });
+        }
+
+        // Install PWA
+        async function installPWA() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                
+                if (outcome === 'accepted') {
+                    console.log('User accepted the install prompt');
+                }
+                
+                deferredPrompt = null;
+                document.getElementById('installPrompt').classList.add('hidden');
+            }
+        }
+
+        // Connection status check
+        function checkConnection() {
+            const indicator = document.getElementById('connectionStatus');
+            const text = document.getElementById('connectionText');
+            
+            if (navigator.onLine) {
+                indicator.className = 'status-indicator status-online';
+                text.textContent = 'Connected';
+            } else {
+                indicator.className = 'status-indicator status-offline';
+                text.textContent = 'Offline';
+            }
+        }
+
+        // Utility functions
+        function hideAllForms() {
+            const forms = ['userCheckForm', 'loginForm', 'registrationForm', 'mainApp'];
+            forms.forEach(form => {
+                document.getElementById(form).classList.add('hidden');
+            });
+        }
+
+        function showError(message) {
             const errorDisplay = document.getElementById('errorDisplay');
             const errorMessage = document.getElementById('errorMessage');
             
@@ -589,7 +857,7 @@
                 errorDisplay.classList.add('hidden');
             }, 5000);
         }
-        
+
         function showSuccess(message) {
             const successDisplay = document.getElementById('successDisplay');
             const successMessage = document.getElementById('successMessage');
@@ -605,7 +873,7 @@
                 successDisplay.classList.add('hidden');
             }, 3000);
         }
-        
+
         function setLoading(elementId, isLoading) {
             const btn = document.getElementById(elementId);
             const loading = document.getElementById(elementId.replace('Btn', 'Loading'));
@@ -618,15 +886,56 @@
                 loading.classList.add('hidden');
             }
         }
-        
-        // Navigation functions
+
+        // Authentication functions
         function showUserCheck() {
             hideAllForms();
             document.getElementById('userCheckForm').classList.remove('hidden');
             document.getElementById('userIdentifier').value = '';
             document.getElementById('userIdentifier').focus();
         }
-        
+
+        async function checkUser() {
+            const identifier = document.getElementById('userIdentifier').value.trim();
+            
+            if (!identifier) {
+                showError('Please enter your email or phone number');
+                return;
+            }
+            
+            setLoading('checkUserBtn', true);
+            
+            try {
+                const response = await fetch('/api/check-user', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ identifier })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    if (result.exists) {
+                        showLogin(result.user);
+                    } else {
+                        showRegistration(identifier);
+                    }
+                } else {
+                    throw new Error(result.error || 'User check failed');
+                }
+                
+            } catch (error) {
+                console.error('Check user error:', error);
+                showError('Error checking user: ' + error.message);
+            } finally {
+                setLoading('checkUserBtn', false);
+            }
+        }
+
         function showLogin(userData) {
             hideAllForms();
             
@@ -642,104 +951,24 @@
             loginForm.classList.remove('hidden');
             document.getElementById('loginPassword').focus();
         }
-        
-        function showRegistration(identifier = '') {
-            hideAllForms();
-            
-            // Pre-fill the identifier
-            if (identifier.includes('@')) {
-                document.getElementById('userEmail').value = identifier;
-                document.getElementById('userPhone').value = '';
-            } else {
-                document.getElementById('userPhone').value = identifier;
-                document.getElementById('userEmail').value = '';
-            }
-            
-            document.getElementById('registrationForm').classList.remove('hidden');
-            document.getElementById('userName').focus();
-        }
-        
-        function hideAllForms() {
-            document.getElementById('userCheckForm').classList.add('hidden');
-            document.getElementById('loginForm').classList.add('hidden');
-            document.getElementById('registrationForm').classList.add('hidden');
-            document.getElementById('mainApp').classList.add('hidden');
-        }
-        
-        // User authentication flow
-        async function checkUser() {
-            const identifier = document.getElementById('userIdentifier').value.trim();
-            
-            if (!identifier) {
-                showError('Please enter your email or phone number');
-                return;
-            }
-            
-            setLoading('checkUserBtn', true);
-            
-            try {
-                const response = await fetch('/api/check-user', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        identifier: identifier
-                    })
-                });
-                
-                const result = await response.json();
-                
-                if (result.exists) {
-                    if (result.user.has_password) {
-                        showLogin(result.user);
-                    } else {
-                        // Auto-login for users without password
-                        await loginUser(identifier, null, true);
-                    }
-                } else {
-                    showRegistration(identifier);
-                }
-                
-            } catch (error) {
-                console.error('Check user error:', error);
-                showError('Failed to check user. Please try again.');
-            } finally {
-                setLoading('checkUserBtn', false);
-            }
-        }
-        
-        async function loginUser(identifier = null, password = null, skipPassword = false) {
-            if (!identifier) {
-                identifier = document.getElementById('userIdentifier').value.trim();
-            }
-            
-            if (!password && !skipPassword) {
-                password = document.getElementById('loginPassword').value;
-            }
-            
-            if (!identifier) {
-                showError('Please enter your email or phone number');
-                return;
-            }
-            
-            if (!skipPassword && !password) {
-                showError('Please enter your password');
-                return;
-            }
+
+        async function login() {
+            const identifier = currentUser?.email || currentUser?.phone || document.getElementById('userIdentifier').value.trim();
+            const password = document.getElementById('loginPassword').value;
             
             setLoading('loginBtn', true);
             
             try {
+                // Get FCM token for notifications
+                const fcmToken = await requestNotificationPermission();
+                
                 const response = await fetch('/api/login', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        identifier: identifier,
-                        password: password || '',
-                        fcm_token: null // We'll add Firebase integration later
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        identifier, 
+                        password,
+                        fcm_token: fcmToken
                     })
                 });
                 
@@ -747,41 +976,90 @@
                 
                 if (result.success) {
                     currentUser = result.user;
-                    currentUserData = result.user;
-                    
-                    // Save to localStorage
-                    localStorage.setItem('fireAlertUser', JSON.stringify(currentUser));
-                    
-                    showSuccess(`Welcome back, ${currentUser.name}!`);
-                    setTimeout(() => {
-                        showMainApp();
-                    }, 1000);
+                    showSuccess('Login successful!');
+                    showMainApp();
                 } else {
-                    showError(result.error || 'Login failed');
+                    throw new Error(result.error || 'Login failed');
                 }
                 
             } catch (error) {
                 console.error('Login error:', error);
-                showError('Login failed. Please check your connection.');
+                showError('Login failed: ' + error.message);
             } finally {
                 setLoading('loginBtn', false);
             }
         }
-        
-        async function registerUser() {
-            const name = document.getElementById('userName').value.trim();
-            const email = document.getElementById('userEmail').value.trim();
-            const phone = document.getElementById('userPhone').value.trim();
-            const password = document.getElementById('userPassword').value;
-            const ranchId = document.getElementById('ranchSelect').value;
+
+        function showRegistration(identifier = '') {
+            hideAllForms();
+            loadRanches();
             
+            const registrationForm = document.getElementById('registrationForm');
+            
+            // Pre-fill identifier if provided
+            if (identifier) {
+                if (identifier.includes('@')) {
+                    document.getElementById('regEmail').value = identifier;
+                } else {
+                    document.getElementById('regPhone').value = identifier;
+                }
+            }
+            
+            registrationForm.classList.remove('hidden');
+            document.getElementById('regName').focus();
+        }
+
+        async function loadRanches() {
+            try {
+                const response = await fetch('/api/ranches');
+                const result = await response.json();
+                
+                if (result.success) {
+                    const ranchSelect = document.getElementById('regRanch');
+                    const targetRanchSelect = document.getElementById('targetRanch');
+                    
+                    // Clear existing options (except first)
+                    ranchSelect.innerHTML = '<option value="">Choose your ranch...</option>';
+                    if (targetRanchSelect) {
+                        targetRanchSelect.innerHTML = '<option value="all">All Ranches</option>';
+                    }
+                    
+                    result.ranches.forEach(ranch => {
+                        const option = document.createElement('option');
+                        option.value = ranch.id;
+                        option.textContent = ranch.name;
+                        ranchSelect.appendChild(option);
+                        
+                        if (targetRanchSelect) {
+                            const targetOption = document.createElement('option');
+                            targetOption.value = ranch.id;
+                            targetOption.textContent = ranch.name;
+                            targetRanchSelect.appendChild(targetOption);
+                        }
+                    });
+                } else {
+                    console.error('Failed to load ranches:', result.error);
+                }
+            } catch (error) {
+                console.error('Error loading ranches:', error);
+            }
+        }
+
+        async function register() {
+            const name = document.getElementById('regName').value.trim();
+            const email = document.getElementById('regEmail').value.trim();
+            const phone = document.getElementById('regPhone').value.trim();
+            const password = document.getElementById('regPassword').value;
+            const ranchId = document.getElementById('regRanch').value;
+            
+            // Validation
             if (!name) {
-                showError('Please enter your name');
+                showError('Please enter your full name');
                 return;
             }
             
             if (!email && !phone) {
-                showError('Please enter either email or phone number');
+                showError('Please enter either an email or phone number');
                 return;
             }
             
@@ -793,18 +1071,19 @@
             setLoading('registerBtn', true);
             
             try {
+                // Get FCM token for notifications
+                const fcmToken = await requestNotificationPermission();
+                
                 const response = await fetch('/api/register', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        name: name,
+                        name,
                         email: email || null,
                         phone: phone || null,
                         password: password || null,
                         ranch_id: parseInt(ranchId),
-                        fcm_token: null // We'll add Firebase integration later
+                        fcm_token: fcmToken
                     })
                 });
                 
@@ -812,131 +1091,49 @@
                 
                 if (result.success) {
                     currentUser = result.user;
-                    currentUserData = result.user;
-                    
-                    // Save to localStorage
-                    localStorage.setItem('fireAlertUser', JSON.stringify(currentUser));
-                    
-                    showSuccess(`Welcome to Ranch Fire Alert, ${currentUser.name}!`);
-                    setTimeout(() => {
-                        showMainApp();
-                    }, 1000);
+                    showSuccess('Registration successful! Welcome to the alert system.');
+                    showMainApp();
                 } else {
-                    if (result.should_login) {
-                        showError('User already exists. Redirecting to login...');
-                        setTimeout(() => {
-                            showUserCheck();
-                        }, 2000);
-                    } else {
-                        showError(result.error || 'Registration failed');
-                    }
+                    throw new Error(result.error || 'Registration failed');
                 }
                 
             } catch (error) {
                 console.error('Registration error:', error);
-                showError('Registration failed. Please check your connection.');
+                showError('Registration failed: ' + error.message);
             } finally {
                 setLoading('registerBtn', false);
             }
         }
-        
-        function logoutUser() {
-            localStorage.removeItem('fireAlertUser');
-            currentUser = null;
-            currentUserData = null;
-            showSuccess('You have been logged out.');
-            setTimeout(() => {
-                showUserCheck();
-            }, 1000);
-        }
-        
-        // Show main app
+
+        // Main application functions
         function showMainApp() {
             hideAllForms();
             document.getElementById('mainApp').classList.remove('hidden');
             
-            // Update user info display
+            // Update user info
             if (currentUser) {
-                document.getElementById('currentUserName').textContent = `Welcome, ${currentUser.name}!`;
+                document.getElementById('userName').textContent = currentUser.name;
+                document.getElementById('userDetails').textContent = 
+                    `${currentUser.email || currentUser.phone} • ${currentUser.ranch_name}`;
                 
-                let details = [];
-                if (currentUser.email) details.push(currentUser.email);
-                if (currentUser.phone) details.push(currentUser.phone);
-                
-                document.getElementById('currentUserDetails').textContent = details.join(' • ');
+                // Show admin tab if user is admin
+                if (currentUser.is_admin) {
+                    document.getElementById('adminTabBtn').style.display = 'block';
+                }
             }
             
             loadAlerts();
+            loadLivestockRequests();
             
             // Set up periodic refresh
-            setInterval(loadAlerts, 30000);
-        }
-        
-        // Initialize app
-        window.addEventListener('load', async () => {
-            // Register service worker
-            if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('/sw.js')
-                    .then(registration => console.log('SW registered'))
-                    .catch(error => console.log('SW registration failed'));
-            }
-            
-            // Initialize Firebase
-            try {
-                const configResponse = await fetch('/api/config');
-                appConfig = await configResponse.json();
-                
-                firebase.initializeApp(appConfig.firebase);
-                messaging = firebase.messaging();
-                console.log('Firebase initialized');
-            } catch (error) {
-                console.error('Firebase initialization failed:', error);
-            }
-            
-            // Check if user is already logged in
-            const savedUser = JSON.parse(localStorage.getItem('fireAlertUser') || 'null');
-            if (savedUser) {
-                currentUser = savedUser;
-                currentUserData = savedUser;
-                showMainApp();
-            } else {
-                showUserCheck();
-            }
-            
-            await loadRanches();
-            updateConnectionStatus(true);
-        });
-        
-        // Load available ranches
-        async function loadRanches() {
-            try {
-                const response = await fetch('/api/ranches');
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            setInterval(() => {
+                if (!document.getElementById('mainApp').classList.contains('hidden')) {
+                    loadAlerts();
+                    loadLivestockRequests();
                 }
-                
-                const ranches = await response.json();
-                
-                const select = document.getElementById('ranchSelect');
-                select.innerHTML = '<option value="">Choose your ranch...</option>';
-                
-                ranches.forEach(ranch => {
-                    const option = document.createElement('option');
-                    option.value = ranch.id;
-                    option.textContent = ranch.name;
-                    select.appendChild(option);
-                });
-                
-                updateConnectionStatus(true);
-                
-            } catch (error) {
-                console.error('Error loading ranches:', error);
-                showError('Failed to load ranches');
-                updateConnectionStatus(false);
-            }
+            }, 30000);
         }
-        
+
         // Tab navigation
         function showTab(tabName) {
             // Hide all tabs
@@ -957,86 +1154,300 @@
             
             if (tabName === 'livestock') {
                 loadLivestockRequests();
+            } else if (tabName === 'admin') {
+                loadAdminStats();
             }
         }
-        
-        // Load active alerts
+
+        // Alerts functions
         async function loadAlerts() {
-            if (!currentUser) return;
-            
             try {
-                const response = await fetch(`/api/alerts?ranch_id=${currentUser.ranch_id}`);
+                const url = currentUser ? `/api/alerts?user_id=${currentUser.id}` : '/api/alerts';
+                const response = await fetch(url);
                 
                 if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
+                    throw new Error(`Server error: ${response.status}`);
                 }
                 
-                const alerts = await response.json();
+                const result = await response.json();
                 
-                const container = document.getElementById('currentAlerts');
-                const noAlerts = document.getElementById('noAlerts');
-                
-                if (alerts.length === 0) {
-                    container.innerHTML = '';
-                    noAlerts.classList.remove('hidden');
+                if (result.success) {
+                    displayAlerts(result.alerts);
+                    updateAlertStats(result.alerts);
                 } else {
-                    noAlerts.classList.add('hidden');
-                    container.innerHTML = alerts.map(alert => `
-                        <div class="card alert-card ${alert.severity}">
-                            <div class="severity-badge severity-${alert.severity}">${alert.severity}</div>
-                            <h3>${alert.title}</h3>
-                            <p>${alert.message}</p>
-                            <div class="timestamp">
-                                ${new Date(alert.created_at).toLocaleString()}
-                            </div>
-                        </div>
-                    `).join('');
+                    throw new Error(result.error || 'Failed to load alerts');
                 }
-                
-                updateConnectionStatus(true);
-                
             } catch (error) {
                 console.error('Error loading alerts:', error);
-                updateConnectionStatus(false);
+                showError('Failed to load alerts: ' + error.message);
             }
         }
-        
-        // Send fire alert
-        async function sendFireAlert() {
-            const title = document.getElementById('alertTitle').value;
-            const message = document.getElementById('alertMessage').value;
+
+        function displayAlerts(alerts) {
+            const alertsList = document.getElementById('alertsList');
+            
+            if (alerts.length === 0) {
+                alertsList.innerHTML = `
+                    <div class="card">
+                        <p style="text-align: center; color: #666;">No fire alerts at this time</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            alertsList.innerHTML = alerts.map(alert => `
+                <div class="card alert-card ${alert.severity}">
+                    <div class="severity-badge severity-${alert.severity}">
+                        ${alert.severity.toUpperCase()}
+                    </div>
+                    <h3>${alert.title}</h3>
+                    <p style="margin: 10px 0;">${alert.message}</p>
+                    <div class="timestamp">
+                        ${new Date(alert.created_at).toLocaleString()}
+                    </div>
+                    ${currentUser && currentUser.is_admin ? `
+                        <div class="admin-alert-actions">
+                            <button class="btn btn-secondary" onclick="editAlert(${alert.id})">Edit</button>
+                            <button class="btn btn-danger" onclick="deleteAlert(${alert.id})">Delete</button>
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('');
+        }
+
+        function updateAlertStats(alerts) {
+            const totalAlerts = alerts.length;
+            const activeAlerts = alerts.filter(alert => 
+                new Date(alert.created_at) > new Date(Date.now() - 24 * 60 * 60 * 1000)
+            ).length;
+            const criticalAlerts = alerts.filter(alert => alert.severity === 'critical').length;
+            
+            document.getElementById('totalAlerts').textContent = totalAlerts;
+            document.getElementById('activeAlerts').textContent = activeAlerts;
+            document.getElementById('criticalAlerts').textContent = criticalAlerts;
+        }
+
+        // Livestock functions
+        async function loadLivestockRequests() {
+            try {
+                const url = currentUser ? `/api/livestock-requests?user_id=${currentUser.id}` : '/api/livestock-requests';
+                const response = await fetch(url);
+                
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    displayLivestockRequests(result.requests);
+                } else {
+                    throw new Error(result.error || 'Failed to load livestock requests');
+                }
+            } catch (error) {
+                console.error('Error loading livestock requests:', error);
+                showError('Failed to load livestock requests: ' + error.message);
+            }
+        }
+
+        function displayLivestockRequests(requests) {
+            const requestsList = document.getElementById('livestockRequestsList');
+            
+            if (requests.length === 0) {
+                requestsList.innerHTML = `
+                    <div class="card">
+                        <p style="text-align: center; color: #666;">No livestock help requests</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            requestsList.innerHTML = requests.map(request => `
+                <div class="livestock-request">
+                    <h4>${request.user_name} - ${request.animal_type} (${request.animal_count})</h4>
+                    <p><strong>Urgency:</strong> ${request.urgency_level.toUpperCase()}</p>
+                    <p>${request.details}</p>
+                    <div class="timestamp">
+                        Requested: ${new Date(request.created_at).toLocaleString()}
+                    </div>
+                    ${request.user_id !== currentUser?.id ? `
+                        <button class="btn btn-success" onclick="offerHelp(${request.id})">
+                            Offer Help
+                        </button>
+                    ` : ''}
+                </div>
+            `).join('');
+        }
+
+        async function requestLivestockHelp() {
+            const animalType = document.getElementById('animalType').value;
+            const animalCount = document.getElementById('animalCount').value;
+            const urgencyLevel = document.getElementById('urgencyLevel').value;
+            const details = document.getElementById('helpDetails').value.trim();
+            
+            if (!animalCount || animalCount <= 0) {
+                showError('Please enter a valid number of animals');
+                return;
+            }
+            
+            if (!details) {
+                showError('Please provide details about the help needed');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/livestock-requests', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: currentUser.id,
+                        animal_type: animalType,
+                        animal_count: parseInt(animalCount),
+                        urgency_level: urgencyLevel,
+                        details
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showSuccess('Livestock help request submitted successfully!');
+                    
+                    // Clear form
+                    document.getElementById('animalCount').value = '';
+                    document.getElementById('helpDetails').value = '';
+                    
+                    // Reload requests
+                    loadLivestockRequests();
+                } else {
+                    throw new Error(result.error || 'Failed to submit request');
+                }
+                
+            } catch (error) {
+                console.error('Error submitting livestock request:', error);
+                showError('Failed to submit request: ' + error.message);
+            }
+        }
+
+        async function offerHelp(requestId) {
+            try {
+                const response = await fetch(`/api/livestock-requests/${requestId}/help`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: currentUser.id })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showSuccess(result.message || 'Help offer sent! The requester will be notified.');
+                } else {
+                    throw new Error(result.error || 'Failed to offer help');
+                }
+                
+            } catch (error) {
+                console.error('Error offering help:', error);
+                showError('Failed to offer help: ' + error.message);
+            }
+        }
+
+        // Admin functions
+        async function loadAdminStats() {
+            if (!currentUser || !currentUser.is_admin) return;
+            
+            try {
+                const response = await fetch(`/api/admin/stats?user_id=${currentUser.id}`);
+                
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    const stats = result.stats;
+                    document.getElementById('adminStats').innerHTML = `
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                            <div style="text-align: center;">
+                                <div style="font-size: 24px; font-weight: bold; color: #d32f2f;">${stats.total_users}</div>
+                                <div style="font-size: 12px; color: #666;">Total Users</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 24px; font-weight: bold; color: #d32f2f;">${stats.total_alerts}</div>
+                                <div style="font-size: 12px; color: #666;">Total Alerts</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 24px; font-weight: bold; color: #ff9800;">${stats.livestock_requests}</div>
+                                <div style="font-size: 12px; color: #666;">Help Requests</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 24px; font-weight: bold; color: #4caf50;">${stats.active_ranches}</div>
+                                <div style="font-size: 12px; color: #666;">Active Ranches</div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    throw new Error(result.error || 'Failed to load admin stats');
+                }
+            } catch (error) {
+                console.error('Error loading admin stats:', error);
+                document.getElementById('adminStats').innerHTML = '<p style="color: #f44336;">Failed to load statistics</p>';
+            }
+        }
+
+        async function sendAlert() {
+            if (!currentUser || !currentUser.is_admin) {
+                showError('Admin access required');
+                return;
+            }
+            
+            const title = document.getElementById('alertTitle').value.trim();
+            const message = document.getElementById('alertMessage').value.trim();
             const severity = document.getElementById('alertSeverity').value;
+            const targetRanch = document.getElementById('targetRanch').value;
             
             if (!title || !message) {
-                showError('Please fill in all fields');
+                showError('Please provide both title and message for the alert');
                 return;
             }
             
             try {
                 const response = await fetch('/api/alerts', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        title: title,
-                        message: message,
-                        severity: severity,
-                        ranch_id: currentUser.ranch_id,
+                        title,
+                        message,
+                        severity,
+                        ranch_id: targetRanch === 'all' ? null : parseInt(targetRanch),
                         user_id: currentUser.id
                     })
                 });
                 
                 if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
+                    throw new Error(`Server error: ${response.status}`);
                 }
                 
                 const result = await response.json();
                 
                 if (result.success) {
-                    showSuccess('🚨 Fire alert sent to all ranch members!');
+                    showSuccess('Fire alert sent successfully!');
+                    
+                    // Clear form
                     document.getElementById('alertTitle').value = '';
                     document.getElementById('alertMessage').value = '';
+                    document.getElementById('alertSeverity').value = 'low';
+                    document.getElementById('targetRanch').value = 'all';
+                    
+                    // Refresh alerts
                     loadAlerts();
                 } else {
                     throw new Error(result.error || 'Failed to send alert');
@@ -1047,184 +1458,86 @@
                 showError('Failed to send alert: ' + error.message);
             }
         }
-        
-        // Request livestock help
-        async function requestLivestockHelp() {
+
+        async function editAlert(alertId) {
+            // This would open an edit form - simplified for demo
+            const newTitle = prompt('Enter new title:');
+            if (newTitle) {
+                try {
+                    const response = await fetch(`/api/alerts/${alertId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ title: newTitle })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        showSuccess('Alert updated successfully!');
+                        loadAlerts();
+                    } else {
+                        throw new Error(result.error || 'Failed to update alert');
+                    }
+                } catch (error) {
+                    console.error('Error updating alert:', error);
+                    showError('Failed to update alert: ' + error.message);
+                }
+            }
+        }
+
+        async function deleteAlert(alertId) {
+            if (!confirm('Are you sure you want to delete this alert?')) return;
+            
             try {
-                const alertsResponse = await fetch(`/api/alerts?ranch_id=${currentUser.ranch_id}`);
-                const alerts = await alertsResponse.json();
-                
-                if (alerts.length === 0) {
-                    showError('No active fire alerts. Livestock requests can only be made during active emergencies.');
-                    return;
-                }
-                
-                const animalType = document.getElementById('animalType').value;
-                const animalCount = document.getElementById('animalCount').value;
-                const pickupLocation = document.getElementById('pickupLocation').value;
-                const contactInfo = document.getElementById('contactInfo').value;
-                const notes = document.getElementById('requestNotes').value;
-                
-                if (!animalCount || !pickupLocation || !contactInfo) {
-                    showError('Please fill in all required fields');
-                    return;
-                }
-                
-                const response = await fetch('/api/livestock-requests', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        fire_alert_id: alerts[0].id,
-                        user_id: currentUser.id,
-                        animal_type: animalType,
-                        animal_count: parseInt(animalCount),
-                        pickup_location: pickupLocation,
-                        contact_info: contactInfo,
-                        notes: notes
-                    })
+                const response = await fetch(`/api/alerts/${alertId}`, {
+                    method: 'DELETE'
                 });
                 
                 const result = await response.json();
+                
                 if (result.success) {
-                    showSuccess('✅ Livestock help request sent to ranch members!');
-                    // Clear form
-                    document.getElementById('animalCount').value = '1';
-                    document.getElementById('pickupLocation').value = '';
-                    document.getElementById('contactInfo').value = '';
-                    document.getElementById('requestNotes').value = '';
-                    loadLivestockRequests();
+                    showSuccess('Alert deleted successfully!');
+                    loadAlerts();
                 } else {
-                    throw new Error(result.error || 'Failed to send request');
+                    throw new Error(result.error || 'Failed to delete alert');
                 }
-                
             } catch (error) {
-                console.error('Error requesting livestock help:', error);
-                showError('Failed to send request: ' + error.message);
+                console.error('Error deleting alert:', error);
+                showError('Failed to delete alert: ' + error.message);
             }
         }
-        
-        // Load livestock requests
-        async function loadLivestockRequests() {
-            try {
-                const alertsResponse = await fetch(`/api/alerts?ranch_id=${currentUser.ranch_id}`);
-                const alerts = await alertsResponse.json();
-                
-                if (alerts.length === 0) {
-                    document.getElementById('livestockRequests').innerHTML = 
-                        '<div class="card"><p>No livestock requests - no active fire alerts.</p></div>';
-                    return;
-                }
-                
-                const response = await fetch(`/api/livestock-requests?fire_alert_id=${alerts[0].id}`);
-                const requests = await response.json();
-                
-                const container = document.getElementById('livestockRequests');
-                
-                if (requests.length === 0) {
-                    container.innerHTML = '<div class="card"><p>No livestock help requests yet.</p></div>';
-                } else {
-                    container.innerHTML = '<h3>Current Help Requests</h3>' + 
-                        requests.map(req => `
-                            <div class="livestock-request">
-                                <h4>🐄 ${req.animal_count} ${req.animal_type}</h4>
-                                <p><strong>Location:</strong> ${req.pickup_location}</p>
-                                <p><strong>Contact:</strong> ${req.contact_info}</p>
-                                ${req.notes ? `<p><strong>Notes:</strong> ${req.notes}</p>` : ''}
-                                <p><strong>Status:</strong> ${req.status}</p>
-                                <div class="timestamp">
-                                    ${new Date(req.created_at).toLocaleString()}
-                                </div>
-                            </div>
-                        `).join('');
-                }
-                
-            } catch (error) {
-                console.error('Error loading livestock requests:', error);
-            }
+
+        function logout() {
+            currentUser = null;
+            showSuccess('Logged out successfully');
+            setTimeout(() => {
+                showUserCheck();
+            }, 1000);
         }
-        
-        // Update connection status
-        function updateConnectionStatus(isOnline) {
-            const statusIndicator = document.getElementById('connectionStatus');
-            const statusText = document.getElementById('connectionText');
-            
-            if (isOnline) {
-                statusIndicator.className = 'status-indicator status-online';
-                statusText.textContent = 'Connected';
-            } else {
-                statusIndicator.className = 'status-indicator status-offline';
-                statusText.textContent = 'Offline';
-            }
-        }
-        
-        // Handle network status
-        window.addEventListener('online', () => updateConnectionStatus(true));
-        window.addEventListener('offline', () => updateConnectionStatus(false));
-        
+
+        // Handle online/offline events
+        window.addEventListener('online', () => {
+            checkConnection();
+            showSuccess('Connection restored');
+        });
+
+        window.addEventListener('offline', () => {
+            checkConnection();
+            showError('Connection lost - app will work offline');
+        });
+
         // Handle Enter key on forms
-        document.addEventListener('keypress', (e) => {
+        document.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 const activeForm = document.querySelector('.card:not(.hidden)');
                 if (activeForm) {
-                    if (activeForm.id === 'userCheckForm') {
-                        checkUser();
-                    } else if (activeForm.id === 'loginForm') {
-                        loginUser();
-                    } else if (activeForm.id === 'registrationForm') {
-                        registerUser();
+                    const button = activeForm.querySelector('.btn:not(.hidden)');
+                    if (button && !button.disabled) {
+                        button.click();
                     }
                 }
             }
         });
-        
-        // Firebase messaging (if available)
-        if (messaging) {
-            // Handle foreground messages
-            messaging.onMessage((payload) => {
-                console.log('Message received in foreground:', payload);
-                
-                // Show notification even when app is open
-                if (payload.notification) {
-                    new Notification(payload.notification.title, {
-                        body: payload.notification.body,
-                        icon: '/icon-192.png',
-                        badge: '/icon-192.png'
-                    });
-                }
-                
-                // Refresh data based on message type
-                if (payload.data) {
-                    if (payload.data.type === 'fire_alert') {
-                        loadAlerts();
-                    } else if (payload.data.type === 'livestock_request') {
-                        loadLivestockRequests();
-                    }
-                }
-            });
-            
-            // Handle token refresh
-            messaging.onTokenRefresh(() => {
-                messaging.getToken({ vapidKey: appConfig?.vapidKey }).then((refreshedToken) => {
-                    console.log('Token refreshed:', refreshedToken);
-                    
-                    // Send the new token to your server
-                    if (currentUser) {
-                        fetch('/api/update-token', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({
-                                user_id: currentUser.id,
-                                fcm_token: refreshedToken
-                            })
-                        });
-                    }
-                });
-            });
-        }
     </script>
 </body>
 </html>

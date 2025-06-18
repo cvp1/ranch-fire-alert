@@ -1,16 +1,18 @@
-# app.py - Flask application with login system integration
-from flask import Flask, request, jsonify, render_template, send_from_directory
+#!/usr/bin/env python3
+"""
+Ranch Fire Alert PWA - Complete Backend with Login System
+Fixed SQLAlchemy 2.0+ compatibility and improved error handling
+"""
+
+import os
+import json
+import hashlib
+import logging
+from datetime import datetime
+from flask import Flask, render_template, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
-import firebase_admin
-from firebase_admin import credentials, messaging
-import os
-from datetime import datetime
-import json
-import logging
-from werkzeug.serving import WSGIRequestHandler
 from dotenv import load_dotenv
-import hashlib
 
 # Load environment variables
 load_dotenv()
@@ -22,34 +24,35 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app)
 
-# Database configuration
+# Configuration
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-key-change-in-production')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///fire_alerts.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
+
+# Initialize extensions
 db = SQLAlchemy(app)
 
-# Custom request handler to suppress socket errors
-class QuietWSGIRequestHandler(WSGIRequestHandler):
-    def log_error(self, format, *args):
-        if "Socket is not connected" not in str(args):
-            super().log_error(format, *args)
-
-# Initialize Firebase Admin SDK
+# Firebase initialization
 firebase_initialized = False
 try:
-    firebase_key_path = os.getenv('FIREBASE_KEY_PATH', 'firebase-key.json')
+    import firebase_admin
+    from firebase_admin import credentials, messaging
+    
+    firebase_key_path = 'firebase-key.json'
+    
     if os.path.exists(firebase_key_path):
         cred = credentials.Certificate(firebase_key_path)
         firebase_admin.initialize_app(cred)
         firebase_initialized = True
         logger.info("Firebase initialized successfully")
     else:
-        logger.warning(f"{firebase_key_path} not found. Creating dummy file...")
+        logger.warning(f"Firebase key file not found at {firebase_key_path}")
+        # Create dummy file for demo
         dummy_key = {
             "type": "service_account",
             "project_id": os.getenv('FIREBASE_PROJECT_ID', 'dmr-fns'),
             "private_key_id": "dummy",
-            "private_key": "-----BEGIN PRIVATE KEY-----\nDUMMY\n-----END PRIVATE KEY-----\n",
+            "private_key": "-----BEGIN PRIVATE KEY-----\\nDUMMY\\n-----END PRIVATE KEY-----\\n",
             "client_email": f"dummy@{os.getenv('FIREBASE_PROJECT_ID', 'dmr-fns')}.iam.gserviceaccount.com",
             "client_id": "dummy",
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
@@ -62,7 +65,7 @@ try:
 except Exception as e:
     logger.error(f"Firebase initialization failed: {e}")
 
-# Database Models (Updated with login system)
+# Database Models
 class Ranch(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
@@ -75,7 +78,7 @@ class User(db.Model):
     name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=True)
     phone = db.Column(db.String(20), nullable=True)
-    password_hash = db.Column(db.String(128), nullable=True)  # Simple hash for demo
+    password_hash = db.Column(db.String(128), nullable=True)
     fcm_token = db.Column(db.String(500), nullable=True)
     ranch_id = db.Column(db.Integer, db.ForeignKey('ranch.id'), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
@@ -97,14 +100,12 @@ class FireAlert(db.Model):
 
 class LivestockRequest(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    fire_alert_id = db.Column(db.Integer, db.ForeignKey('fire_alert.id'), nullable=False)
-    requester_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     animal_type = db.Column(db.String(50), nullable=False)
     animal_count = db.Column(db.Integer, nullable=False)
-    pickup_location = db.Column(db.String(200), nullable=False)
-    contact_info = db.Column(db.String(200), nullable=False)
+    urgency_level = db.Column(db.String(20), default='medium')
+    details = db.Column(db.Text, nullable=False)
     status = db.Column(db.String(20), default='open')
-    notes = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 # Helper functions for authentication
@@ -126,10 +127,16 @@ def internal_error(error):
 def not_found(error):
     return jsonify({'success': False, 'error': 'Not found'}), 404
 
-# API Routes
+# Main Routes
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/firebase-messaging-sw.js')
+def firebase_sw():
+    """Serve the Firebase messaging service worker"""
+    from flask import send_from_directory
+    return send_from_directory('static', 'firebase-messaging-sw.js', mimetype='application/javascript')
 
 @app.route('/api/config', methods=['GET'])
 def get_config():
@@ -159,17 +166,19 @@ def status():
         'timestamp': datetime.utcnow().isoformat()
     })
 
-# NEW LOGIN SYSTEM ROUTES
-
+# User Authentication Routes
 @app.route('/api/check-user', methods=['POST'])
 def check_user():
     """Check if a user exists by email or phone"""
     try:
         data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+            
         identifier = data.get('identifier', '').strip()
         
         if not identifier:
-            return jsonify({'exists': False})
+            return jsonify({'success': True, 'exists': False})
         
         user = None
         if '@' in identifier:
@@ -178,8 +187,10 @@ def check_user():
             user = User.query.filter_by(phone=identifier).first()
         
         if user:
-            ranch = Ranch.query.get(user.ranch_id)
+            # Use SQLAlchemy 2.0+ compatible syntax
+            ranch = db.session.get(Ranch, user.ranch_id)
             return jsonify({
+                'success': True,
                 'exists': True,
                 'user': {
                     'id': user.id,
@@ -187,15 +198,16 @@ def check_user():
                     'email': user.email,
                     'phone': user.phone,
                     'ranch_name': ranch.name if ranch else 'Unknown Ranch',
-                    'has_password': bool(user.password_hash)
+                    'has_password': bool(user.password_hash),
+                    'is_admin': user.is_admin
                 }
             })
         else:
-            return jsonify({'exists': False})
+            return jsonify({'success': True, 'exists': False})
             
     except Exception as e:
         logger.error(f"Check user error: {e}")
-        return jsonify({'exists': False})
+        return jsonify({'success': False, 'error': f'Check user failed: {str(e)}'}), 500
 
 @app.route('/api/login', methods=['POST'])
 def login_user():
@@ -204,7 +216,7 @@ def login_user():
         if not data:
             return jsonify({'success': False, 'error': 'No data provided'}), 400
         
-        identifier = data.get('identifier', '').strip()  # email or phone
+        identifier = data.get('identifier', '').strip()
         password = data.get('password', '')
         
         if not identifier:
@@ -235,6 +247,9 @@ def login_user():
         user.last_login = datetime.utcnow()
         db.session.commit()
         
+        # Get ranch info using SQLAlchemy 2.0+ syntax
+        ranch = db.session.get(Ranch, user.ranch_id)
+        
         logger.info(f"User logged in: {user.name} (ID: {user.id})")
         return jsonify({
             'success': True,
@@ -244,13 +259,14 @@ def login_user():
                 'email': user.email,
                 'phone': user.phone,
                 'ranch_id': user.ranch_id,
+                'ranch_name': ranch.name if ranch else 'Unknown Ranch',
                 'is_admin': user.is_admin
             }
         })
         
     except Exception as e:
         logger.error(f"Login error: {e}")
-        return jsonify({'success': False, 'error': 'Login failed'}), 500
+        return jsonify({'success': False, 'error': f'Login failed: {str(e)}'}), 500
 
 @app.route('/api/register', methods=['POST'])
 def register_user():
@@ -259,98 +275,119 @@ def register_user():
         if not data:
             return jsonify({'success': False, 'error': 'No data provided'}), 400
         
-        required_fields = ['name', 'ranch_id']
-        for field in required_fields:
-            if field not in data:
-                return jsonify({'success': False, 'error': f'Missing field: {field}'}), 400
+        name = data.get('name', '').strip()
+        email = data.get('email', '').strip() if data.get('email') else None
+        phone = data.get('phone', '').strip() if data.get('phone') else None
+        password = data.get('password', '').strip() if data.get('password') else None
+        ranch_id = data.get('ranch_id')
         
-        # Check if user already exists by email or phone
-        email = data.get('email', '').strip().lower()
-        phone = data.get('phone', '').strip()
+        # Validation
+        if not name:
+            return jsonify({'success': False, 'error': 'Name is required'}), 400
         
+        if not email and not phone:
+            return jsonify({'success': False, 'error': 'Email or phone number is required'}), 400
+        
+        if not ranch_id:
+            return jsonify({'success': False, 'error': 'Ranch selection is required'}), 400
+        
+        # Check if user already exists
         existing_user = None
         if email:
-            existing_user = User.query.filter_by(email=email).first()
-        elif phone:
+            existing_user = User.query.filter_by(email=email.lower()).first()
+        if not existing_user and phone:
             existing_user = User.query.filter_by(phone=phone).first()
         
         if existing_user:
-            return jsonify({
-                'success': False, 
-                'error': 'User already exists. Please use login instead.',
-                'should_login': True
-            }), 400
+            return jsonify({'success': False, 'error': 'User already exists with this email or phone'}), 400
         
-        # Create password hash if provided
-        password_hash = None
-        if data.get('password'):
-            password_hash = simple_hash(data['password'])
+        # Verify ranch exists using SQLAlchemy 2.0+ syntax
+        ranch = db.session.get(Ranch, ranch_id)
+        if not ranch:
+            return jsonify({'success': False, 'error': 'Invalid ranch selection'}), 400
         
+        # Create new user
         user = User(
-            name=data['name'],
-            email=email if email else None,
-            phone=phone if phone else None,
-            password_hash=password_hash,
+            name=name,
+            email=email.lower() if email else None,
+            phone=phone,
+            password_hash=simple_hash(password) if password else None,
+            ranch_id=ranch_id,
             fcm_token=data.get('fcm_token'),
-            ranch_id=data['ranch_id']
+            is_admin=False
         )
         
         db.session.add(user)
         db.session.commit()
         
-        logger.info(f"User registered: {user.name} (ID: {user.id})")
+        logger.info(f"New user registered: {user.name} (ID: {user.id})")
         return jsonify({
-            'success': True, 
-            'user_id': user.id,
+            'success': True,
             'user': {
                 'id': user.id,
                 'name': user.name,
                 'email': user.email,
                 'phone': user.phone,
-                'ranch_id': user.ranch_id
+                'ranch_id': user.ranch_id,
+                'ranch_name': ranch.name,
+                'is_admin': user.is_admin
             }
         })
         
     except Exception as e:
         logger.error(f"Registration error: {e}")
         db.session.rollback()
-        return jsonify({'success': False, 'error': 'Registration failed'}), 500
-
-# EXISTING ROUTES (Updated for login system compatibility)
+        return jsonify({'success': False, 'error': f'Registration failed: {str(e)}'}), 500
 
 @app.route('/api/ranches', methods=['GET'])
 def get_ranches():
     try:
         ranches = Ranch.query.all()
-        return jsonify([{
-            'id': r.id,
-            'name': r.name,
-            'latitude': r.latitude,
-            'longitude': r.longitude
-        } for r in ranches])
+        return jsonify({
+            'success': True,
+            'ranches': [{
+                'id': ranch.id,
+                'name': ranch.name,
+                'latitude': ranch.latitude,
+                'longitude': ranch.longitude,
+                'radius_miles': ranch.radius_miles
+            } for ranch in ranches]
+        })
     except Exception as e:
         logger.error(f"Error getting ranches: {e}")
         return jsonify({'success': False, 'error': 'Failed to get ranches'}), 500
 
+# Alert Management Routes
 @app.route('/api/alerts', methods=['GET'])
 def get_alerts():
     try:
-        ranch_id = request.args.get('ranch_id')
-        if ranch_id:
-            alerts = FireAlert.query.filter_by(ranch_id=ranch_id, status='active').all()
-        else:
-            alerts = FireAlert.query.filter_by(status='active').all()
+        user_id = request.args.get('user_id')
         
-        return jsonify([{
-            'id': alert.id,
-            'title': alert.title,
-            'message': alert.message,
-            'severity': alert.severity,
-            'status': alert.status,
-            'latitude': alert.latitude,
-            'longitude': alert.longitude,
-            'created_at': alert.created_at.isoformat()
-        } for alert in alerts])
+        if user_id:
+            # Get alerts for user's ranch using SQLAlchemy 2.0+ syntax
+            user = db.session.get(User, user_id)
+            if not user:
+                return jsonify({'success': False, 'error': 'User not found'}), 404
+            
+            alerts = FireAlert.query.filter_by(ranch_id=user.ranch_id).order_by(FireAlert.created_at.desc()).all()
+        else:
+            # Get all active alerts
+            alerts = FireAlert.query.filter_by(status='active').order_by(FireAlert.created_at.desc()).all()
+        
+        return jsonify({
+            'success': True,
+            'alerts': [{
+                'id': alert.id,
+                'title': alert.title,
+                'message': alert.message,
+                'severity': alert.severity,
+                'status': alert.status,
+                'latitude': alert.latitude,
+                'longitude': alert.longitude,
+                'created_at': alert.created_at.isoformat(),
+                'updated_at': alert.updated_at.isoformat()
+            } for alert in alerts]
+        })
         
     except Exception as e:
         logger.error(f"Error getting alerts: {e}")
@@ -360,111 +397,320 @@ def get_alerts():
 def create_alert():
     try:
         data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+        
+        title = data.get('title', '').strip()
+        message = data.get('message', '').strip()
+        severity = data.get('severity', 'medium')
+        ranch_id = data.get('ranch_id')
+        user_id = data.get('user_id')
+        
+        if not title or not message:
+            return jsonify({'success': False, 'error': 'Title and message are required'}), 400
+        
+        if not user_id:
+            return jsonify({'success': False, 'error': 'User ID required'}), 400
+        
+        # Verify user exists and get ranch_id if not provided
+        user = db.session.get(User, user_id)
+        if not user:
+            return jsonify({'success': False, 'error': 'User not found'}), 404
+        
+        # Use user's ranch if ranch_id not specified
+        if not ranch_id:
+            ranch_id = user.ranch_id
+        
+        # Verify ranch exists
+        ranch = db.session.get(Ranch, ranch_id)
+        if not ranch:
+            return jsonify({'success': False, 'error': 'Ranch not found'}), 404
+        
+        # Create alert
         alert = FireAlert(
-            title=data['title'],
-            message=data['message'],
-            ranch_id=data['ranch_id'],
-            severity=data.get('severity', 'medium'),
+            title=title,
+            message=message,
+            ranch_id=ranch_id,
+            severity=severity,
             latitude=data.get('latitude'),
             longitude=data.get('longitude'),
-            created_by=data['user_id']
+            created_by=user_id
         )
         
         db.session.add(alert)
         db.session.commit()
         
-        send_fire_alert_notification(alert)
+        # Send push notifications if Firebase is enabled
+        if firebase_initialized:
+            send_fire_alert_notification(alert)
         
-        logger.info(f"Fire alert created: {alert.title} (ID: {alert.id})")
-        return jsonify({'success': True, 'alert_id': alert.id})
+        logger.info(f"Alert created: {alert.title} (ID: {alert.id})")
+        return jsonify({
+            'success': True,
+            'alert': {
+                'id': alert.id,
+                'title': alert.title,
+                'message': alert.message,
+                'severity': alert.severity,
+                'created_at': alert.created_at.isoformat()
+            }
+        })
         
     except Exception as e:
         logger.error(f"Error creating alert: {e}")
         db.session.rollback()
-        return jsonify({'success': False, 'error': 'Failed to create alert'}), 500
+        return jsonify({'success': False, 'error': f'Failed to create alert: {str(e)}'}), 500
 
-@app.route('/api/livestock-requests', methods=['POST'])
-def create_livestock_request():
+@app.route('/api/alerts/<int:alert_id>', methods=['PUT'])
+def update_alert(alert_id):
+    """Update an existing alert"""
     try:
         data = request.get_json()
-        request_obj = LivestockRequest(
-            fire_alert_id=data['fire_alert_id'],
-            requester_id=data['user_id'],
-            animal_type=data['animal_type'],
-            animal_count=data['animal_count'],
-            pickup_location=data['pickup_location'],
-            contact_info=data['contact_info'],
-            notes=data.get('notes')
-        )
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
         
-        db.session.add(request_obj)
+        # Get the alert
+        alert = db.session.get(FireAlert, alert_id)
+        if not alert:
+            return jsonify({'success': False, 'error': 'Alert not found'}), 404
+        
+        # Update fields if provided
+        if 'title' in data:
+            alert.title = data['title'].strip()
+        if 'message' in data:
+            alert.message = data['message'].strip()
+        if 'severity' in data:
+            alert.severity = data['severity']
+        if 'status' in data:
+            alert.status = data['status']
+        
+        alert.updated_at = datetime.utcnow()
         db.session.commit()
         
-        send_livestock_request_notification(request_obj)
-        
-        logger.info(f"Livestock request created: {request_obj.id}")
-        return jsonify({'success': True, 'request_id': request_obj.id})
+        logger.info(f"Alert updated: {alert.title} (ID: {alert.id})")
+        return jsonify({
+            'success': True,
+            'alert': {
+                'id': alert.id,
+                'title': alert.title,
+                'message': alert.message,
+                'severity': alert.severity,
+                'status': alert.status,
+                'updated_at': alert.updated_at.isoformat()
+            }
+        })
         
     except Exception as e:
-        logger.error(f"Error creating livestock request: {e}")
+        logger.error(f"Error updating alert: {e}")
         db.session.rollback()
-        return jsonify({'success': False, 'error': 'Failed to create livestock request'}), 500
+        return jsonify({'success': False, 'error': f'Failed to update alert: {str(e)}'}), 500
 
+@app.route('/api/alerts/<int:alert_id>', methods=['DELETE'])
+def delete_alert(alert_id):
+    """Delete an alert"""
+    try:
+        # Get the alert
+        alert = db.session.get(FireAlert, alert_id)
+        if not alert:
+            return jsonify({'success': False, 'error': 'Alert not found'}), 404
+        
+        # Delete the alert
+        db.session.delete(alert)
+        db.session.commit()
+        
+        logger.info(f"Alert deleted: {alert.title} (ID: {alert.id})")
+        return jsonify({'success': True, 'message': 'Alert deleted successfully'})
+        
+    except Exception as e:
+        logger.error(f"Error deleting alert: {e}")
+        db.session.rollback()
+        return jsonify({'success': False, 'error': f'Failed to delete alert: {str(e)}'}), 500
+
+# Livestock Request Routes
 @app.route('/api/livestock-requests', methods=['GET'])
 def get_livestock_requests():
     try:
-        fire_alert_id = request.args.get('fire_alert_id')
-        requests = LivestockRequest.query.filter_by(fire_alert_id=fire_alert_id).all()
+        user_id = request.args.get('user_id')
         
-        return jsonify([{
-            'id': req.id,
-            'animal_type': req.animal_type,
-            'animal_count': req.animal_count,
-            'pickup_location': req.pickup_location,
-            'contact_info': req.contact_info,
-            'status': req.status,
-            'notes': req.notes,
-            'created_at': req.created_at.isoformat()
-        } for req in requests])
+        if user_id:
+            # Get requests for user's ranch
+            user = db.session.get(User, user_id)
+            if not user:
+                return jsonify({'success': False, 'error': 'User not found'}), 404
+            
+            # Get all users in the same ranch to include their requests
+            ranch_users = User.query.filter_by(ranch_id=user.ranch_id).all()
+            user_ids = [u.id for u in ranch_users]
+            
+            requests = LivestockRequest.query.filter(LivestockRequest.user_id.in_(user_ids)).order_by(LivestockRequest.created_at.desc()).all()
+        else:
+            requests = LivestockRequest.query.order_by(LivestockRequest.created_at.desc()).all()
+        
+        # Format requests with user names
+        request_list = []
+        for req in requests:
+            user = db.session.get(User, req.user_id)
+            request_list.append({
+                'id': req.id,
+                'user_id': req.user_id,
+                'user_name': user.name if user else 'Unknown User',
+                'animal_type': req.animal_type,
+                'animal_count': req.animal_count,
+                'urgency_level': req.urgency_level,
+                'details': req.details,
+                'status': req.status,
+                'created_at': req.created_at.isoformat()
+            })
+        
+        return jsonify({
+            'success': True,
+            'requests': request_list
+        })
         
     except Exception as e:
         logger.error(f"Error getting livestock requests: {e}")
         return jsonify({'success': False, 'error': 'Failed to get livestock requests'}), 500
 
-# Static file routes
-@app.route('/manifest.json')
-def manifest():
-    return send_from_directory('static', 'manifest.json')
+@app.route('/api/livestock-requests', methods=['POST'])
+def create_livestock_request():
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+        
+        user_id = data.get('user_id')
+        animal_type = data.get('animal_type', '').strip()
+        animal_count = data.get('animal_count')
+        urgency_level = data.get('urgency_level', 'medium')
+        details = data.get('details', '').strip()
+        
+        if not user_id:
+            return jsonify({'success': False, 'error': 'User ID required'}), 400
+        
+        if not animal_type or not animal_count or not details:
+            return jsonify({'success': False, 'error': 'Animal type, count, and details are required'}), 400
+        
+        # Verify user exists
+        user = db.session.get(User, user_id)
+        if not user:
+            return jsonify({'success': False, 'error': 'User not found'}), 404
+        
+        # Create livestock request
+        livestock_request = LivestockRequest(
+            user_id=user_id,
+            animal_type=animal_type,
+            animal_count=animal_count,
+            urgency_level=urgency_level,
+            details=details
+        )
+        
+        db.session.add(livestock_request)
+        db.session.commit()
+        
+        logger.info(f"Livestock request created: {animal_type} x{animal_count} by user {user_id}")
+        return jsonify({
+            'success': True,
+            'request': {
+                'id': livestock_request.id,
+                'animal_type': livestock_request.animal_type,
+                'animal_count': livestock_request.animal_count,
+                'urgency_level': livestock_request.urgency_level,
+                'details': livestock_request.details,
+                'created_at': livestock_request.created_at.isoformat()
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error creating livestock request: {e}")
+        db.session.rollback()
+        return jsonify({'success': False, 'error': f'Failed to create livestock request: {str(e)}'}), 500
 
-@app.route('/sw.js')
-def service_worker():
-    return send_from_directory('static', 'sw.js')
+@app.route('/api/livestock-requests/<int:request_id>/help', methods=['POST'])
+def offer_help(request_id):
+    """Offer help for a livestock request"""
+    try:
+        data = request.get_json()
+        helper_user_id = data.get('user_id') if data else None
+        
+        if not helper_user_id:
+            return jsonify({'success': False, 'error': 'User ID required'}), 400
+        
+        # Get the livestock request
+        livestock_request = db.session.get(LivestockRequest, request_id)
+        if not livestock_request:
+            return jsonify({'success': False, 'error': 'Livestock request not found'}), 404
+        
+        # Get helper user
+        helper_user = db.session.get(User, helper_user_id)
+        if not helper_user:
+            return jsonify({'success': False, 'error': 'Helper user not found'}), 404
+        
+        # Get requester user
+        requester_user = db.session.get(User, livestock_request.user_id)
+        if not requester_user:
+            return jsonify({'success': False, 'error': 'Requester user not found'}), 404
+        
+        # For now, just log the help offer
+        # In a full implementation, you might create a help_offers table
+        logger.info(f"Help offered: {helper_user.name} offered to help {requester_user.name} with {livestock_request.animal_type}")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Help offer sent to {requester_user.name}'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error offering help: {e}")
+        return jsonify({'success': False, 'error': f'Failed to offer help: {str(e)}'}), 500
 
-@app.route('/icon-192.png')
-def icon_192():
-    return send_from_directory('static/icons', 'icon-192.png')
+# Admin Routes
+@app.route('/api/admin/stats', methods=['GET'])
+def get_admin_stats():
+    try:
+        user_id = request.args.get('user_id')
+        
+        if not user_id:
+            return jsonify({'success': False, 'error': 'User ID required'}), 400
+        
+        user = db.session.get(User, user_id)
+        if not user or not user.is_admin:
+            return jsonify({'success': False, 'error': 'Admin access required'}), 403
+        
+        # Get statistics
+        total_users = User.query.count()
+        total_alerts = FireAlert.query.count()
+        livestock_requests = LivestockRequest.query.count()
+        active_ranches = Ranch.query.count()
+        
+        return jsonify({
+            'success': True,
+            'stats': {
+                'total_users': total_users,
+                'total_alerts': total_alerts,
+                'livestock_requests': livestock_requests,
+                'active_ranches': active_ranches
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting admin stats: {e}")
+        return jsonify({'success': False, 'error': 'Failed to get statistics'}), 500
 
-@app.route('/icon-512.png')
-def icon_512():
-    return send_from_directory('static/icons', 'icon-512.png')
-
-@app.route('/favicon.ico')
-def favicon():
-    return send_from_directory('static/icons', 'icon-192.png')
-
-# Push notification functions
+# Push Notification Functions
 def send_fire_alert_notification(alert):
     if not firebase_initialized:
-        logger.warning("Firebase not initialized - skipping notification")
         return
         
     try:
-        ranch = Ranch.query.get(alert.ranch_id)
+        # Get ranch and users
+        ranch = db.session.get(Ranch, alert.ranch_id)
+        if not ranch:
+            return
+            
         users = User.query.filter_by(ranch_id=ranch.id).all()
         tokens = [user.fcm_token for user in users if user.fcm_token]
         
         if not tokens:
-            logger.warning("No FCM tokens found for notification")
             return
         
         message = messaging.MulticastMessage(
@@ -487,38 +733,6 @@ def send_fire_alert_notification(alert):
     except Exception as e:
         logger.error(f"Failed to send fire alert notification: {e}")
 
-def send_livestock_request_notification(livestock_request):
-    if not firebase_initialized:
-        return
-        
-    try:
-        fire_alert = FireAlert.query.get(livestock_request.fire_alert_id)
-        ranch = Ranch.query.get(fire_alert.ranch_id)
-        users = User.query.filter_by(ranch_id=ranch.id).all()
-        tokens = [user.fcm_token for user in users if user.fcm_token]
-        
-        if not tokens:
-            return
-        
-        message = messaging.MulticastMessage(
-            notification=messaging.Notification(
-                title=f"🐄 Livestock Help Needed - {ranch.name}",
-                body=f"Need help moving {livestock_request.animal_count} {livestock_request.animal_type}"
-            ),
-            data={
-                'request_id': str(livestock_request.id),
-                'fire_alert_id': str(fire_alert.id),
-                'type': 'livestock_request'
-            },
-            tokens=tokens
-        )
-        
-        response = messaging.send_multicast(message)
-        logger.info(f"Livestock notification - Success: {response.success_count}, Failures: {response.failure_count}")
-        
-    except Exception as e:
-        logger.error(f"Failed to send livestock notification: {e}")
-
 # Initialize database
 def create_tables():
     with app.app_context():
@@ -526,60 +740,111 @@ def create_tables():
         
         # Update existing database schema if needed
         try:
-            # Check if User table needs email/password columns
             from sqlalchemy import inspect, text
             inspector = inspect(db.engine)
-            user_columns = [column['name'] for column in inspector.get_columns('user')]
             
-            # Use the correct SQLAlchemy 2.0+ syntax
-            if 'email' not in user_columns:
+            # Check if User table exists and get its columns
+            try:
+                user_columns = [column['name'] for column in inspector.get_columns('user')]
+                logger.info(f"Current User table columns: {user_columns}")
+            except Exception:
+                # Table doesn't exist, will be created by db.create_all()
+                user_columns = []
+            
+            # Use SQLAlchemy 2.0+ compatible syntax
+            if user_columns and 'email' not in user_columns:
                 logger.info("Adding email column to User table")
                 with db.engine.connect() as conn:
                     conn.execute(text('ALTER TABLE "user" ADD COLUMN email VARCHAR(120)'))
                     conn.commit()
             
-            if 'password_hash' not in user_columns:
+            if user_columns and 'password_hash' not in user_columns:
                 logger.info("Adding password_hash column to User table")
                 with db.engine.connect() as conn:
                     conn.execute(text('ALTER TABLE "user" ADD COLUMN password_hash VARCHAR(128)'))
                     conn.commit()
                 
-            if 'last_login' not in user_columns:
+            if user_columns and 'last_login' not in user_columns:
                 logger.info("Adding last_login column to User table")
                 with db.engine.connect() as conn:
                     conn.execute(text('ALTER TABLE "user" ADD COLUMN last_login TIMESTAMP'))
                     conn.commit()
                     
-            if 'is_admin' not in user_columns:
+            if user_columns and 'is_admin' not in user_columns:
                 logger.info("Adding is_admin column to User table")
                 with db.engine.connect() as conn:
                     conn.execute(text('ALTER TABLE "user" ADD COLUMN is_admin BOOLEAN DEFAULT FALSE'))
                     conn.commit()
                     
-            if 'created_at' not in user_columns:
+            if user_columns and 'created_at' not in user_columns:
                 logger.info("Adding created_at column to User table")
                 with db.engine.connect() as conn:
                     conn.execute(text('ALTER TABLE "user" ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP'))
                     conn.commit()
+            
+            # Check and migrate LivestockRequest table
+            if 'livestock_request' in inspector.get_table_names():
+                livestock_columns = [column['name'] for column in inspector.get_columns('livestock_request')]
+                logger.info(f"Current LivestockRequest table columns: {livestock_columns}")
+                
+                # Migrate from old schema if needed
+                if 'requester_id' in livestock_columns and 'user_id' not in livestock_columns:
+                    logger.info("Migrating LivestockRequest from old schema to new schema")
+                    
+                    with db.engine.connect() as conn:
+                        # Add new columns
+                        conn.execute(text('ALTER TABLE livestock_request ADD COLUMN user_id INTEGER'))
+                        
+                        if 'urgency_level' not in livestock_columns:
+                            conn.execute(text('ALTER TABLE livestock_request ADD COLUMN urgency_level VARCHAR(20) DEFAULT \'medium\''))
+                        
+                        if 'details' not in livestock_columns:
+                            conn.execute(text('ALTER TABLE livestock_request ADD COLUMN details TEXT'))
+                        
+                        # Copy data from old columns
+                        conn.execute(text('UPDATE livestock_request SET user_id = requester_id WHERE user_id IS NULL'))
+                        
+                        # Set default values for new columns
+                        if 'notes' in livestock_columns:
+                            conn.execute(text('UPDATE livestock_request SET details = COALESCE(notes, \'Help needed\') WHERE details IS NULL'))
+                        else:
+                            conn.execute(text('UPDATE livestock_request SET details = \'Help needed\' WHERE details IS NULL'))
+                        
+                        conn.commit()
+                        logger.info("LivestockRequest migration completed")
                 
         except Exception as e:
             logger.info(f"Database schema update not needed or failed: {e}")
         
-        # Create sample ranches if none exist
+        # Create sample ranch if none exist
         if Ranch.query.count() == 0:
-            sample_ranches = [
-                Ranch(name="Dragoon Mountain Ranch", latitude=31.9190, longitude=-109.9673, radius_miles=10.0),
-                Ranch(name="Mountain View Ranch", latitude=31.9290, longitude=-109.9773, radius_miles=8.0),
-                Ranch(name="Desert Springs Ranch", latitude=31.9090, longitude=-109.9573, radius_miles=12.0)
-            ]
+            dragoon_ranch = Ranch(
+                name="Dragoon Mountain Ranch", 
+                latitude=31.9190, 
+                longitude=-109.9673, 
+                radius_miles=10.0
+            )
             
-            for ranch in sample_ranches:
-                db.session.add(ranch)
-            
+            db.session.add(dragoon_ranch)
             db.session.commit()
-            logger.info(f"Created {len(sample_ranches)} sample ranches")
+            logger.info("Created Dragoon Mountain Ranch")
         else:
             logger.info(f"Found {Ranch.query.count()} existing ranches")
+
+        # Create admin user if none exists
+        if not User.query.filter_by(is_admin=True).first():
+            admin_ranch = Ranch.query.first()
+            if admin_ranch:
+                admin_user = User(
+                    name="Admin User",
+                    email="admin@ranch.local",
+                    password_hash=simple_hash("admin123"),
+                    ranch_id=admin_ranch.id,
+                    is_admin=True
+                )
+                db.session.add(admin_user)
+                db.session.commit()
+                logger.info("Created admin user: admin@ranch.local / admin123")
 
 if __name__ == '__main__':
     create_tables()
@@ -596,6 +861,5 @@ if __name__ == '__main__':
         debug=debug,
         host=host,
         port=port,
-        threaded=True,
-        request_handler=QuietWSGIRequestHandler
+        threaded=True
     )
