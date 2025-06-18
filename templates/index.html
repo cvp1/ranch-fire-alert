@@ -341,17 +341,98 @@
         }
         
         .admin-alert-actions {
-            margin-top: 15px;
+            margin-top: 10px;
             display: flex;
             gap: 8px;
-            flex-wrap: wrap;
         }
         
         .admin-alert-actions .btn {
             flex: 1;
-            padding: 8px;
             font-size: 12px;
-            margin-bottom: 0;
+            padding: 6px 12px;
+            margin: 0;
+        }
+        
+        .admin-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            align-items: center;
+        }
+        
+        .admin-controls .btn {
+            flex: 0 0 auto;
+            margin: 0;
+        }
+        
+        .admin-controls select {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        
+        .alert-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+        
+        .alert-table th,
+        .alert-table td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .alert-table th {
+            background: #f5f5f5;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .alert-table tr:hover {
+            background: #f9f9f9;
+        }
+        
+        .alert-status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .status-active {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+        
+        .status-resolved {
+            background: #e8f5e8;
+            color: #388e3c;
+        }
+        
+        .alert-actions {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+        
+        .alert-actions .btn {
+            font-size: 11px;
+            padding: 4px 8px;
+            margin: 0;
+            min-width: auto;
+        }
+        
+        .alert-details {
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
         
         .logout-section {
@@ -607,6 +688,21 @@
                     <h3>📊 System Statistics</h3>
                     <div id="adminStats">
                         <p>Loading statistics...</p>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h3>🔧 Alert Management</h3>
+                    <div class="admin-controls">
+                        <button class="btn btn-secondary" onclick="loadAdminAlerts()">Refresh Alerts</button>
+                        <select id="alertFilter" onchange="filterAdminAlerts()">
+                            <option value="all">All Alerts</option>
+                            <option value="active">Active Only</option>
+                            <option value="resolved">Resolved Only</option>
+                        </select>
+                    </div>
+                    <div id="adminAlertsList">
+                        <p>Click "Refresh Alerts" to load alert management data...</p>
                     </div>
                 </div>
             </div>
@@ -1196,9 +1292,14 @@
             }
             
             alertsList.innerHTML = alerts.map(alert => `
-                <div class="card alert-card ${alert.severity}">
-                    <div class="severity-badge severity-${alert.severity}">
-                        ${alert.severity.toUpperCase()}
+                <div class="card alert-card ${alert.severity}" data-alert-id="${alert.id}">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                        <div class="severity-badge severity-${alert.severity}">
+                            ${alert.severity.toUpperCase()}
+                        </div>
+                        <span class="alert-status status-${alert.status}">
+                            ${alert.status}
+                        </span>
                     </div>
                     <h3>${alert.title}</h3>
                     <p style="margin: 10px 0;">${alert.message}</p>
@@ -1207,8 +1308,12 @@
                     </div>
                     ${currentUser && currentUser.is_admin ? `
                         <div class="admin-alert-actions">
-                            <button class="btn btn-secondary" onclick="editAlert(${alert.id})">Edit</button>
-                            <button class="btn btn-danger" onclick="deleteAlert(${alert.id})">Delete</button>
+                            <button class="btn btn-secondary" onclick="editAlert(${alert.id})">✏️ Edit</button>
+                            ${alert.status === 'active' ? 
+                                `<button class="btn btn-success" onclick="resolveAlert(${alert.id})">✅ Resolve</button>` :
+                                `<button class="btn btn-secondary" onclick="reopenAlert(${alert.id})">🔄 Re-open</button>`
+                            }
+                            <button class="btn btn-danger" onclick="deleteAlert(${alert.id})">🗑️ Delete</button>
                         </div>
                     ` : ''}
                 </div>
@@ -1217,9 +1322,8 @@
 
         function updateAlertStats(alerts) {
             const totalAlerts = alerts.length;
-            const activeAlerts = alerts.filter(alert => 
-                new Date(alert.created_at) > new Date(Date.now() - 24 * 60 * 60 * 1000)
-            ).length;
+            const activeAlerts = alerts.filter(alert => alert.status === 'active').length;
+            const resolvedAlerts = alerts.filter(alert => alert.status === 'resolved').length;
             const criticalAlerts = alerts.filter(alert => alert.severity === 'critical').length;
             
             document.getElementById('totalAlerts').textContent = totalAlerts;
@@ -1385,6 +1489,14 @@
                                 <div style="font-size: 12px; color: #666;">Total Alerts</div>
                             </div>
                             <div style="text-align: center;">
+                                <div style="font-size: 20px; font-weight: bold; color: #1976d2;">${stats.active_alerts}</div>
+                                <div style="font-size: 12px; color: #666;">Active Alerts</div>
+                            </div>
+                            <div style="text-align: center;">
+                                <div style="font-size: 20px; font-weight: bold; color: #388e3c;">${stats.resolved_alerts}</div>
+                                <div style="font-size: 12px; color: #666;">Resolved Alerts</div>
+                            </div>
+                            <div style="text-align: center;">
                                 <div style="font-size: 24px; font-weight: bold; color: #ff9800;">${stats.livestock_requests}</div>
                                 <div style="font-size: 12px; color: #666;">Help Requests</div>
                             </div>
@@ -1460,28 +1572,265 @@
         }
 
         async function editAlert(alertId) {
-            // This would open an edit form - simplified for demo
-            const newTitle = prompt('Enter new title:');
-            if (newTitle) {
-                try {
-                    const response = await fetch(`/api/alerts/${alertId}`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ title: newTitle })
-                    });
-                    
-                    const result = await response.json();
-                    
-                    if (result.success) {
-                        showSuccess('Alert updated successfully!');
-                        loadAlerts();
-                    } else {
-                        throw new Error(result.error || 'Failed to update alert');
-                    }
-                } catch (error) {
-                    console.error('Error updating alert:', error);
-                    showError('Failed to update alert: ' + error.message);
+            // Get current alert data
+            try {
+                const response = await fetch(`/api/alerts/${alertId}`);
+                const result = await response.json();
+                
+                if (!result.success) {
+                    throw new Error(result.error || 'Failed to get alert data');
                 }
+                
+                const alert = result.alert;
+                
+                // Create edit form
+                const editForm = `
+                    <div class="card" style="margin-top: 15px;">
+                        <h4>Edit Alert</h4>
+                        <div class="form-group">
+                            <label>Title</label>
+                            <input type="text" id="editTitle" value="${alert.title}" />
+                        </div>
+                        <div class="form-group">
+                            <label>Message</label>
+                            <textarea id="editMessage" rows="3">${alert.message}</textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Severity</label>
+                            <select id="editSeverity">
+                                <option value="low" ${alert.severity === 'low' ? 'selected' : ''}>🟡 Low</option>
+                                <option value="medium" ${alert.severity === 'medium' ? 'selected' : ''}>🟠 Medium</option>
+                                <option value="high" ${alert.severity === 'high' ? 'selected' : ''}>🔴 High</option>
+                                <option value="critical" ${alert.severity === 'critical' ? 'selected' : ''}>⚫ Critical</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Status</label>
+                            <select id="editStatus">
+                                <option value="active" ${alert.status === 'active' ? 'selected' : ''}>Active</option>
+                                <option value="resolved" ${alert.status === 'resolved' ? 'selected' : ''}>Resolved</option>
+                            </select>
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button class="btn btn-secondary" onclick="saveAlertEdit(${alertId})">Save Changes</button>
+                            <button class="btn" onclick="cancelEdit()">Cancel</button>
+                        </div>
+                    </div>
+                `;
+                
+                // Show edit form
+                const alertElement = document.querySelector(`[data-alert-id="${alertId}"]`);
+                if (alertElement) {
+                    alertElement.insertAdjacentHTML('afterend', editForm);
+                }
+                
+            } catch (error) {
+                console.error('Error loading alert for edit:', error);
+                showError('Failed to load alert data: ' + error.message);
+            }
+        }
+
+        async function saveAlertEdit(alertId) {
+            const title = document.getElementById('editTitle').value.trim();
+            const message = document.getElementById('editMessage').value.trim();
+            const severity = document.getElementById('editSeverity').value;
+            const status = document.getElementById('editStatus').value;
+            
+            if (!title || !message) {
+                showError('Title and message are required');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/alerts/${alertId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title,
+                        message,
+                        severity,
+                        status
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showSuccess('Alert updated successfully!');
+                    cancelEdit();
+                    loadAlerts();
+                    if (currentUser && currentUser.is_admin) {
+                        loadAdminAlerts();
+                    }
+                } else {
+                    throw new Error(result.error || 'Failed to update alert');
+                }
+            } catch (error) {
+                console.error('Error updating alert:', error);
+                showError('Failed to update alert: ' + error.message);
+            }
+        }
+
+        function cancelEdit() {
+            const editForm = document.querySelector('.card h4');
+            if (editForm && editForm.textContent === 'Edit Alert') {
+                editForm.closest('.card').remove();
+            }
+        }
+
+        // Admin alert management functions
+        async function loadAdminAlerts() {
+            if (!currentUser || !currentUser.is_admin) return;
+            
+            try {
+                const response = await fetch(`/api/admin/alerts?user_id=${currentUser.id}`);
+                
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    displayAdminAlerts(result.alerts);
+                } else {
+                    throw new Error(result.error || 'Failed to load admin alerts');
+                }
+            } catch (error) {
+                console.error('Error loading admin alerts:', error);
+                document.getElementById('adminAlertsList').innerHTML = 
+                    '<p style="color: #f44336;">Failed to load alerts: ' + error.message + '</p>';
+            }
+        }
+
+        function displayAdminAlerts(alerts) {
+            const alertsList = document.getElementById('adminAlertsList');
+            
+            if (alerts.length === 0) {
+                alertsList.innerHTML = '<p style="text-align: center; color: #666;">No alerts found</p>';
+                return;
+            }
+            
+            const tableHTML = `
+                <table class="alert-table">
+                    <thead>
+                        <tr>
+                            <th>Title</th>
+                            <th>Severity</th>
+                            <th>Status</th>
+                            <th>Creator</th>
+                            <th>Ranch</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${alerts.map(alert => `
+                            <tr data-alert-id="${alert.id}">
+                                <td>
+                                    <div class="alert-details" title="${alert.title}">
+                                        <strong>${alert.title}</strong>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="severity-badge severity-${alert.severity}">
+                                        ${alert.severity.toUpperCase()}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="alert-status status-${alert.status}">
+                                        ${alert.status}
+                                    </span>
+                                </td>
+                                <td>${alert.creator_name}</td>
+                                <td>${alert.ranch_name}</td>
+                                <td>${new Date(alert.created_at).toLocaleDateString()}</td>
+                                <td>
+                                    <div class="alert-actions">
+                                        <button class="btn btn-secondary" onclick="editAlert(${alert.id})" title="Edit Alert">
+                                            ✏️ Edit
+                                        </button>
+                                        ${alert.status === 'active' ? 
+                                            `<button class="btn btn-success" onclick="resolveAlert(${alert.id})" title="Resolve Alert">
+                                                ✅ Resolve
+                                            </button>` :
+                                            `<button class="btn btn-secondary" onclick="reopenAlert(${alert.id})" title="Re-open Alert">
+                                                🔄 Re-open
+                                            </button>`
+                                        }
+                                        <button class="btn btn-danger" onclick="deleteAlert(${alert.id})" title="Delete Alert">
+                                            🗑️ Delete
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+            
+            alertsList.innerHTML = tableHTML;
+        }
+
+        function filterAdminAlerts() {
+            const filter = document.getElementById('alertFilter').value;
+            const rows = document.querySelectorAll('.alert-table tbody tr');
+            
+            rows.forEach(row => {
+                const statusCell = row.querySelector('.alert-status');
+                const status = statusCell ? statusCell.textContent.trim() : '';
+                
+                if (filter === 'all' || status === filter) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        async function resolveAlert(alertId) {
+            if (!confirm('Are you sure you want to resolve this alert?')) return;
+            
+            try {
+                const response = await fetch(`/api/admin/alerts/${alertId}/resolve?user_id=${currentUser.id}`, {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showSuccess('Alert resolved successfully!');
+                    loadAdminAlerts();
+                    loadAlerts(); // Refresh regular alerts view too
+                } else {
+                    throw new Error(result.error || 'Failed to resolve alert');
+                }
+            } catch (error) {
+                console.error('Error resolving alert:', error);
+                showError('Failed to resolve alert: ' + error.message);
+            }
+        }
+
+        async function reopenAlert(alertId) {
+            if (!confirm('Are you sure you want to re-open this alert?')) return;
+            
+            try {
+                const response = await fetch(`/api/admin/alerts/${alertId}/reopen?user_id=${currentUser.id}`, {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showSuccess('Alert reopened successfully!');
+                    loadAdminAlerts();
+                    loadAlerts(); // Refresh regular alerts view too
+                } else {
+                    throw new Error(result.error || 'Failed to reopen alert');
+                }
+            } catch (error) {
+                console.error('Error reopening alert:', error);
+                showError('Failed to reopen alert: ' + error.message);
             }
         }
 
@@ -1498,6 +1847,9 @@
                 if (result.success) {
                     showSuccess('Alert deleted successfully!');
                     loadAlerts();
+                    if (currentUser && currentUser.is_admin) {
+                        loadAdminAlerts();
+                    }
                 } else {
                     throw new Error(result.error || 'Failed to delete alert');
                 }

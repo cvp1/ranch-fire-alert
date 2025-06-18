@@ -461,6 +461,38 @@ def create_alert():
         db.session.rollback()
         return jsonify({'success': False, 'error': f'Failed to create alert: {str(e)}'}), 500
 
+@app.route('/api/alerts/<int:alert_id>', methods=['GET'])
+def get_alert(alert_id):
+    """Get a single alert by ID"""
+    try:
+        alert = db.session.get(FireAlert, alert_id)
+        if not alert:
+            return jsonify({'success': False, 'error': 'Alert not found'}), 404
+        
+        creator = db.session.get(User, alert.created_by)
+        ranch = db.session.get(Ranch, alert.ranch_id)
+        
+        return jsonify({
+            'success': True,
+            'alert': {
+                'id': alert.id,
+                'title': alert.title,
+                'message': alert.message,
+                'severity': alert.severity,
+                'status': alert.status,
+                'latitude': alert.latitude,
+                'longitude': alert.longitude,
+                'created_at': alert.created_at.isoformat(),
+                'updated_at': alert.updated_at.isoformat(),
+                'creator_name': creator.name if creator else 'Unknown User',
+                'ranch_name': ranch.name if ranch else 'Unknown Ranch'
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting alert: {e}")
+        return jsonify({'success': False, 'error': 'Failed to get alert'}), 500
+
 @app.route('/api/alerts/<int:alert_id>', methods=['PUT'])
 def update_alert(alert_id):
     """Update an existing alert"""
@@ -679,6 +711,8 @@ def get_admin_stats():
         # Get statistics
         total_users = User.query.count()
         total_alerts = FireAlert.query.count()
+        active_alerts = FireAlert.query.filter_by(status='active').count()
+        resolved_alerts = FireAlert.query.filter_by(status='resolved').count()
         livestock_requests = LivestockRequest.query.count()
         active_ranches = Ranch.query.count()
         
@@ -687,6 +721,8 @@ def get_admin_stats():
             'stats': {
                 'total_users': total_users,
                 'total_alerts': total_alerts,
+                'active_alerts': active_alerts,
+                'resolved_alerts': resolved_alerts,
                 'livestock_requests': livestock_requests,
                 'active_ranches': active_ranches
             }
@@ -695,6 +731,124 @@ def get_admin_stats():
     except Exception as e:
         logger.error(f"Error getting admin stats: {e}")
         return jsonify({'success': False, 'error': 'Failed to get statistics'}), 500
+
+@app.route('/api/admin/alerts', methods=['GET'])
+def get_admin_alerts():
+    """Get all alerts for admin management"""
+    try:
+        user_id = request.args.get('user_id')
+        
+        if not user_id:
+            return jsonify({'success': False, 'error': 'User ID required'}), 400
+        
+        user = db.session.get(User, user_id)
+        if not user or not user.is_admin:
+            return jsonify({'success': False, 'error': 'Admin access required'}), 403
+        
+        # Get all alerts with creator and ranch information
+        alerts = FireAlert.query.order_by(FireAlert.created_at.desc()).all()
+        
+        alert_list = []
+        for alert in alerts:
+            creator = db.session.get(User, alert.created_by)
+            ranch = db.session.get(Ranch, alert.ranch_id)
+            
+            alert_list.append({
+                'id': alert.id,
+                'title': alert.title,
+                'message': alert.message,
+                'severity': alert.severity,
+                'status': alert.status,
+                'latitude': alert.latitude,
+                'longitude': alert.longitude,
+                'created_at': alert.created_at.isoformat(),
+                'updated_at': alert.updated_at.isoformat(),
+                'creator_name': creator.name if creator else 'Unknown User',
+                'ranch_name': ranch.name if ranch else 'Unknown Ranch'
+            })
+        
+        return jsonify({
+            'success': True,
+            'alerts': alert_list
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting admin alerts: {e}")
+        return jsonify({'success': False, 'error': 'Failed to get alerts'}), 500
+
+@app.route('/api/admin/alerts/<int:alert_id>/resolve', methods=['POST'])
+def resolve_alert(alert_id):
+    """Resolve an alert"""
+    try:
+        user_id = request.args.get('user_id')
+        
+        if not user_id:
+            return jsonify({'success': False, 'error': 'User ID required'}), 400
+        
+        user = db.session.get(User, user_id)
+        if not user or not user.is_admin:
+            return jsonify({'success': False, 'error': 'Admin access required'}), 403
+        
+        alert = db.session.get(FireAlert, alert_id)
+        if not alert:
+            return jsonify({'success': False, 'error': 'Alert not found'}), 404
+        
+        alert.status = 'resolved'
+        alert.updated_at = datetime.utcnow()
+        db.session.commit()
+        
+        logger.info(f"Alert resolved: {alert.title} (ID: {alert.id}) by admin {user.name}")
+        return jsonify({
+            'success': True,
+            'message': 'Alert resolved successfully',
+            'alert': {
+                'id': alert.id,
+                'status': alert.status,
+                'updated_at': alert.updated_at.isoformat()
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error resolving alert: {e}")
+        db.session.rollback()
+        return jsonify({'success': False, 'error': f'Failed to resolve alert: {str(e)}'}), 500
+
+@app.route('/api/admin/alerts/<int:alert_id>/reopen', methods=['POST'])
+def reopen_alert(alert_id):
+    """Re-open a resolved alert"""
+    try:
+        user_id = request.args.get('user_id')
+        
+        if not user_id:
+            return jsonify({'success': False, 'error': 'User ID required'}), 400
+        
+        user = db.session.get(User, user_id)
+        if not user or not user.is_admin:
+            return jsonify({'success': False, 'error': 'Admin access required'}), 403
+        
+        alert = db.session.get(FireAlert, alert_id)
+        if not alert:
+            return jsonify({'success': False, 'error': 'Alert not found'}), 404
+        
+        alert.status = 'active'
+        alert.updated_at = datetime.utcnow()
+        db.session.commit()
+        
+        logger.info(f"Alert reopened: {alert.title} (ID: {alert.id}) by admin {user.name}")
+        return jsonify({
+            'success': True,
+            'message': 'Alert reopened successfully',
+            'alert': {
+                'id': alert.id,
+                'status': alert.status,
+                'updated_at': alert.updated_at.isoformat()
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Error reopening alert: {e}")
+        db.session.rollback()
+        return jsonify({'success': False, 'error': f'Failed to reopen alert: {str(e)}'}), 500
 
 # Push Notification Functions
 def send_fire_alert_notification(alert):
