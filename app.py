@@ -26,8 +26,26 @@ CORS(app)
 
 # Configuration
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-key-change-in-production')
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///fire_alerts.db')
+
+# Database configuration with fallback
+database_url = os.getenv('DATABASE_URL')
+if database_url:
+    # Use PostgreSQL if DATABASE_URL is provided
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+    logger.info("Using PostgreSQL database")
+else:
+    # Fallback to SQLite with persistent storage
+    data_dir = os.path.join(os.getcwd(), 'data')
+    os.makedirs(data_dir, exist_ok=True)
+    sqlite_path = os.path.join(data_dir, 'fire_alerts.db')
+    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{sqlite_path}'
+    logger.info(f"Using SQLite database at {sqlite_path}")
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_pre_ping': True,
+    'pool_recycle': 300,
+}
 
 # Initialize extensions
 db = SQLAlchemy(app)
@@ -850,6 +868,96 @@ def reopen_alert(alert_id):
         db.session.rollback()
         return jsonify({'success': False, 'error': f'Failed to reopen alert: {str(e)}'}), 500
 
+@app.route('/api/admin/database/backup', methods=['POST'])
+def admin_backup_database():
+    """Create a database backup (admin only)"""
+    try:
+        user_id = request.args.get('user_id')
+        
+        if not user_id:
+            return jsonify({'success': False, 'error': 'User ID required'}), 400
+        
+        user = db.session.get(User, user_id)
+        if not user or not user.is_admin:
+            return jsonify({'success': False, 'error': 'Admin access required'}), 403
+        
+        backup_file = backup_database()
+        
+        if backup_file:
+            return jsonify({
+                'success': True,
+                'message': 'Database backup created successfully',
+                'backup_file': backup_file
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to create backup'
+            }), 500
+        
+    except Exception as e:
+        logger.error(f"Error creating database backup: {e}")
+        return jsonify({'success': False, 'error': f'Failed to create backup: {str(e)}'}), 500
+
+@app.route('/api/admin/database/status', methods=['GET'])
+def admin_database_status():
+    """Get database status and info (admin only)"""
+    try:
+        user_id = request.args.get('user_id')
+        
+        if not user_id:
+            return jsonify({'success': False, 'error': 'User ID required'}), 400
+        
+        user = db.session.get(User, user_id)
+        if not user or not user.is_admin:
+            return jsonify({'success': False, 'error': 'Admin access required'}), 403
+        
+        # Get database info
+        db_info = {
+            'type': 'PostgreSQL' if not app.config['SQLALCHEMY_DATABASE_URI'].startswith('sqlite') else 'SQLite',
+            'uri': app.config['SQLALCHEMY_DATABASE_URI'].replace('://', '://***:***@') if '@' in app.config['SQLALCHEMY_DATABASE_URI'] else app.config['SQLALCHEMY_DATABASE_URI'],
+            'tables': [],
+            'backups': []
+        }
+        
+        # Get table info
+        try:
+            from sqlalchemy import inspect
+            inspector = inspect(db.engine)
+            db_info['tables'] = inspector.get_table_names()
+        except Exception as e:
+            logger.error(f"Error getting table info: {e}")
+        
+        # Get backup info (for SQLite)
+        if app.config['SQLALCHEMY_DATABASE_URI'].startswith('sqlite'):
+            try:
+                import glob
+                import os
+                data_dir = os.path.join(os.getcwd(), 'data')
+                backup_dir = os.path.join(data_dir, 'backups')
+                
+                if os.path.exists(backup_dir):
+                    backup_files = glob.glob(os.path.join(backup_dir, 'fire_alerts_backup_*.db'))
+                    db_info['backups'] = [
+                        {
+                            'filename': os.path.basename(f),
+                            'size': os.path.getsize(f),
+                            'modified': datetime.fromtimestamp(os.path.getmtime(f)).isoformat()
+                        }
+                        for f in backup_files
+                    ]
+            except Exception as e:
+                logger.error(f"Error getting backup info: {e}")
+        
+        return jsonify({
+            'success': True,
+            'database': db_info
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting database status: {e}")
+        return jsonify({'success': False, 'error': f'Failed to get database status: {str(e)}'}), 500
+
 # Push Notification Functions
 def send_fire_alert_notification(alert):
     if not firebase_initialized:
@@ -887,9 +995,106 @@ def send_fire_alert_notification(alert):
     except Exception as e:
         logger.error(f"Failed to send fire alert notification: {e}")
 
+# Database backup and recovery functions
+def backup_database():
+    """Create a backup of the database"""
+    try:
+        import shutil
+        from datetime import datetime
+        
+        data_dir = os.path.join(os.getcwd(), 'data')
+        os.makedirs(data_dir, exist_ok=True)
+        
+        # Create backup directory
+        backup_dir = os.path.join(data_dir, 'backups')
+        os.makedirs(backup_dir, exist_ok=True)
+        
+        # Generate backup filename with timestamp
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        
+        if app.config['SQLALCHEMY_DATABASE_URI'].startswith('sqlite'):
+            # SQLite backup
+            source_db = app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
+            backup_file = os.path.join(backup_dir, f'fire_alerts_backup_{timestamp}.db')
+            
+            if os.path.exists(source_db):
+                shutil.copy2(source_db, backup_file)
+                logger.info(f"Database backup created: {backup_file}")
+                return backup_file
+        else:
+            # PostgreSQL backup (would need pg_dump in production)
+            logger.info("PostgreSQL backup would require pg_dump utility")
+            return None
+            
+    except Exception as e:
+        logger.error(f"Database backup failed: {e}")
+        return None
+
+def restore_database(backup_file):
+    """Restore database from backup"""
+    try:
+        import shutil
+        
+        if app.config['SQLALCHEMY_DATABASE_URI'].startswith('sqlite'):
+            # SQLite restore
+            target_db = app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
+            
+            if os.path.exists(backup_file):
+                shutil.copy2(backup_file, target_db)
+                logger.info(f"Database restored from: {backup_file}")
+                return True
+        else:
+            # PostgreSQL restore (would need psql in production)
+            logger.info("PostgreSQL restore would require psql utility")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Database restore failed: {e}")
+        return False
+
+def cleanup_old_backups(max_backups=10):
+    """Clean up old backup files, keeping only the most recent ones"""
+    try:
+        import glob
+        from datetime import datetime
+        
+        data_dir = os.path.join(os.getcwd(), 'data')
+        backup_dir = os.path.join(data_dir, 'backups')
+        
+        if not os.path.exists(backup_dir):
+            return
+        
+        # Get all backup files
+        backup_files = glob.glob(os.path.join(backup_dir, 'fire_alerts_backup_*.db'))
+        
+        if len(backup_files) > max_backups:
+            # Sort by modification time (oldest first)
+            backup_files.sort(key=os.path.getmtime)
+            
+            # Remove oldest files
+            files_to_remove = backup_files[:-max_backups]
+            for file_path in files_to_remove:
+                os.remove(file_path)
+                logger.info(f"Removed old backup: {file_path}")
+                
+    except Exception as e:
+        logger.error(f"Backup cleanup failed: {e}")
+
 # Initialize database
 def create_tables():
     with app.app_context():
+        try:
+            # Test database connection
+            db.engine.execute("SELECT 1")
+            logger.info("Database connection successful")
+        except Exception as e:
+            logger.error(f"Database connection failed: {e}")
+            return
+        
+        # Create backup before making changes
+        if app.config['SQLALCHEMY_DATABASE_URI'].startswith('sqlite'):
+            backup_database()
+        
         db.create_all()
         
         # Update existing database schema if needed
@@ -999,6 +1204,11 @@ def create_tables():
                 db.session.add(admin_user)
                 db.session.commit()
                 logger.info("Created admin user: admin@ranch.local / admin123")
+        
+        # Clean up old backups
+        cleanup_old_backups()
+        
+        logger.info("Database initialization completed successfully")
 
 if __name__ == '__main__':
     create_tables()

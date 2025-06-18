@@ -705,6 +705,17 @@
                         <p>Click "Refresh Alerts" to load alert management data...</p>
                     </div>
                 </div>
+                
+                <div class="card">
+                    <h3>🗄️ Database Management</h3>
+                    <div class="admin-controls">
+                        <button class="btn btn-secondary" onclick="loadDatabaseStatus()">Database Status</button>
+                        <button class="btn btn-success" onclick="createDatabaseBackup()">Create Backup</button>
+                    </div>
+                    <div id="databaseStatus">
+                        <p>Click "Database Status" to view database information...</p>
+                    </div>
+                </div>
             </div>
 
             <!-- Logout -->
@@ -1937,6 +1948,96 @@
                 console.error('Session validation error:', error);
                 // On network error, still show main app (offline mode)
                 showMainApp();
+            }
+        }
+
+        // Database management functions
+        async function loadDatabaseStatus() {
+            if (!currentUser || !currentUser.is_admin) return;
+            
+            try {
+                const response = await fetch(`/api/admin/database/status?user_id=${currentUser.id}`);
+                
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    displayDatabaseStatus(result.database);
+                } else {
+                    throw new Error(result.error || 'Failed to load database status');
+                }
+            } catch (error) {
+                console.error('Error loading database status:', error);
+                document.getElementById('databaseStatus').innerHTML = 
+                    '<p style="color: #f44336;">Failed to load database status: ' + error.message + '</p>';
+            }
+        }
+
+        function displayDatabaseStatus(dbInfo) {
+            const statusDiv = document.getElementById('databaseStatus');
+            
+            let backupsHtml = '';
+            if (dbInfo.backups && dbInfo.backups.length > 0) {
+                backupsHtml = `
+                    <h4>Backups (${dbInfo.backups.length})</h4>
+                    <div style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; margin: 10px 0;">
+                        ${dbInfo.backups.map(backup => `
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid #eee;">
+                                <div>
+                                    <strong>${backup.filename}</strong><br>
+                                    <small>Size: ${(backup.size / 1024).toFixed(1)} KB</small>
+                                </div>
+                                <div style="text-align: right;">
+                                    <small>${new Date(backup.modified).toLocaleString()}</small>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+            
+            statusDiv.innerHTML = `
+                <div style="margin-bottom: 15px;">
+                    <h4>Database Information</h4>
+                    <p><strong>Type:</strong> ${dbInfo.type}</p>
+                    <p><strong>Connection:</strong> ${dbInfo.uri}</p>
+                    <p><strong>Tables:</strong> ${dbInfo.tables.length} tables</p>
+                    <ul style="margin: 5px 0; padding-left: 20px;">
+                        ${dbInfo.tables.map(table => `<li>${table}</li>`).join('')}
+                    </ul>
+                </div>
+                ${backupsHtml}
+            `;
+        }
+
+        async function createDatabaseBackup() {
+            if (!currentUser || !currentUser.is_admin) return;
+            
+            if (!confirm('Create a database backup? This may take a moment.')) return;
+            
+            try {
+                const response = await fetch(`/api/admin/database/backup?user_id=${currentUser.id}`, {
+                    method: 'POST'
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showSuccess('Database backup created successfully!');
+                    loadDatabaseStatus(); // Refresh status to show new backup
+                } else {
+                    throw new Error(result.error || 'Failed to create backup');
+                }
+            } catch (error) {
+                console.error('Error creating database backup:', error);
+                showError('Failed to create backup: ' + error.message);
             }
         }
     </script>

@@ -330,3 +330,212 @@ If you encounter issues:
 - ✅ Improved error handling and validation
 - ✅ Added Docker support for easy deployment
 - ✅ Enhanced livestock coordination features
+
+## Database Persistence
+
+### PostgreSQL (Recommended for Production)
+
+The system is configured to use PostgreSQL by default for better reliability and data persistence:
+
+```bash
+# Using Docker Compose (recommended)
+docker-compose up -d
+
+# This will:
+# - Start PostgreSQL with persistent volumes
+# - Initialize the database with sample data
+# - Create admin user: admin@ranch.local / admin123
+```
+
+### SQLite (Development/Simple Deployment)
+
+For simple deployments, the system can fall back to SQLite:
+
+```bash
+# Set environment variable to disable PostgreSQL
+export DATABASE_URL=""
+
+# Run the application
+python app.py
+```
+
+## Quick Start
+
+### Prerequisites
+
+- Python 3.8+
+- Docker and Docker Compose (for production)
+- Firebase project (for push notifications)
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd ranch-fire-alert
+   ```
+
+2. **Install dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Set up environment variables**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your Firebase configuration
+   ```
+
+4. **Run with Docker (recommended)**
+   ```bash
+   docker-compose up -d
+   ```
+
+5. **Or run locally**
+   ```bash
+   python app.py
+   ```
+
+6. **Access the application**
+   - Web: http://localhost:8088
+   - Admin: admin@ranch.local / admin123
+
+## Database Management
+
+### Automatic Backups
+
+The system automatically creates backups when:
+- Database schema changes are made
+- The application starts up (for SQLite)
+
+### Manual Backups
+
+Admins can create manual backups through the admin interface:
+1. Log in as admin
+2. Go to Admin tab
+3. Click "Database Status" to view current backups
+4. Click "Create Backup" to create a new backup
+
+### Backup Location
+
+- **SQLite**: `./data/backups/` directory
+- **PostgreSQL**: Requires `pg_dump` utility (not included in container)
+
+### Data Persistence
+
+#### Docker Volumes
+
+The following volumes ensure data persistence:
+
+```yaml
+volumes:
+  postgres_data:    # PostgreSQL database files
+  redis_data:       # Redis cache and sessions
+  app_data:         # Application data (SQLite, logs)
+  app_backups:      # Database backups
+```
+
+#### Backup Strategy
+
+- **Automatic**: Before schema changes
+- **Manual**: Via admin interface
+- **Retention**: Keeps last 10 backups
+- **Location**: `./data/backups/` directory
+
+## Deployment
+
+### Production Deployment
+
+1. **Update environment variables**
+   ```bash
+   # Production settings
+   export FLASK_ENV=production
+   export SECRET_KEY=your-secure-secret-key
+   export DATABASE_URL=postgresql://user:pass@host:port/db
+   ```
+
+2. **Deploy with Docker Compose**
+   ```bash
+   docker-compose -f docker-compose.yml --profile production up -d
+   ```
+
+3. **Set up SSL/HTTPS** (required for PWA features)
+   ```bash
+   # Configure nginx with SSL certificates
+   # Update nginx.conf with your domain
+   ```
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DATABASE_URL` | PostgreSQL connection string | SQLite fallback |
+| `SECRET_KEY` | Flask secret key | dev-key-change-in-production |
+| `FLASK_ENV` | Flask environment | development |
+| `FIREBASE_API_KEY` | Firebase API key | demo key |
+| `FIREBASE_PROJECT_ID` | Firebase project ID | dmr-fns |
+
+## Troubleshooting
+
+### Database Issues
+
+**Problem**: Data is lost after deployment
+**Solution**: 
+- Ensure Docker volumes are properly mounted
+- Check that `DATABASE_URL` is set correctly
+- Verify PostgreSQL container is running: `docker-compose ps`
+
+**Problem**: Database connection errors
+**Solution**:
+- Check PostgreSQL logs: `docker-compose logs db`
+- Verify network connectivity between containers
+- Ensure database credentials are correct
+
+### Session Issues
+
+**Problem**: Users get logged out on page refresh
+**Solution**: 
+- Check browser localStorage support
+- Verify session validation is working
+- Check for JavaScript errors in browser console
+
+## Development
+
+### Local Development
+
+```bash
+# Start development environment
+docker-compose up -d
+
+# View logs
+docker-compose logs -f web
+
+# Access database
+docker-compose exec db psql -U ranch_user -d ranch_alerts
+
+# Run tests
+python -m pytest tests/
+```
+
+### Database Migrations
+
+The system automatically handles schema migrations. For manual migrations:
+
+```bash
+# Create backup before changes
+curl -X POST "http://localhost:8088/api/admin/database/backup?user_id=1"
+
+# Check database status
+curl "http://localhost:8088/api/admin/database/status?user_id=1"
+```
+
+## Security
+
+- All admin functions require admin privileges
+- Database backups are stored securely
+- Session validation prevents unauthorized access
+- Input validation on all API endpoints
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.

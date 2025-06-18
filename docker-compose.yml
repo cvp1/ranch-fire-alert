@@ -25,8 +25,9 @@ services:
     volumes:
       # Mount source code for development (comment out for production)
       - .:/app
-      # Mount persistent storage for SQLite (if using SQLite instead of PostgreSQL)
+      # Mount persistent storage for data and backups
       - app_data:/app/data
+      - app_backups:/app/data/backups
     depends_on:
       - db
       - redis
@@ -41,19 +42,25 @@ services:
       - POSTGRES_DB=ranch_alerts
       - POSTGRES_USER=ranch_user
       - POSTGRES_PASSWORD=ranch_password
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ports:
       - "5432:5432"
     restart: unless-stopped
     networks:
       - ranch_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ranch_user -d ranch_alerts"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Redis for caching and sessions
   redis:
     image: redis:7-alpine
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --save 60 1000
     volumes:
       - redis_data:/data
     ports:
@@ -61,6 +68,11 @@ services:
     restart: unless-stopped
     networks:
       - ranch_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Nginx reverse proxy (optional, for production)
   nginx:
@@ -81,8 +93,13 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
   redis_data:
+    driver: local
   app_data:
+    driver: local
+  app_backups:
+    driver: local
 
 networks:
   ranch_network:
