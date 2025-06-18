@@ -324,7 +324,6 @@ If you encounter issues:
 **Built with ❤️ for the Dragoon Mountain Ranch community and rural ranch safety**
 
 ### Recent Updates
-- ✅ Simplified to single ranch (Dragoon Mountain Ranch)
 - ✅ Enhanced user authentication system
 - ✅ Fixed SQLAlchemy 2.0+ compatibility
 - ✅ Added Firebase service worker support
