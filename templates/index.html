@@ -775,7 +775,22 @@
             checkConnection();
             setupPWA();
             loadConfig();
-            showUserCheck();
+            
+            // Check for existing session
+            const savedUser = localStorage.getItem('ranchFireAlertUser');
+            if (savedUser) {
+                try {
+                    currentUser = JSON.parse(savedUser);
+                    // Validate session with server
+                    validateSession();
+                } catch (error) {
+                    console.error('Error loading saved session:', error);
+                    localStorage.removeItem('ranchFireAlertUser');
+                    showUserCheck();
+                }
+            } else {
+                showUserCheck();
+            }
             
             // Set up periodic tasks
             setInterval(checkConnection, 10000);
@@ -1072,6 +1087,8 @@
                 
                 if (result.success) {
                     currentUser = result.user;
+                    // Save user session to localStorage
+                    localStorage.setItem('ranchFireAlertUser', JSON.stringify(currentUser));
                     showSuccess('Login successful!');
                     showMainApp();
                 } else {
@@ -1187,6 +1204,8 @@
                 
                 if (result.success) {
                     currentUser = result.user;
+                    // Save user session to localStorage
+                    localStorage.setItem('ranchFireAlertUser', JSON.stringify(currentUser));
                     showSuccess('Registration successful! Welcome to the alert system.');
                     showMainApp();
                 } else {
@@ -1861,6 +1880,8 @@
 
         function logout() {
             currentUser = null;
+            // Clear session from localStorage
+            localStorage.removeItem('ranchFireAlertUser');
             showSuccess('Logged out successfully');
             setTimeout(() => {
                 showUserCheck();
@@ -1890,6 +1911,34 @@
                 }
             }
         });
+
+        // Session validation
+        async function validateSession() {
+            if (!currentUser || !currentUser.id) {
+                localStorage.removeItem('ranchFireAlertUser');
+                showUserCheck();
+                return;
+            }
+            
+            try {
+                // Try to load alerts to validate session
+                const response = await fetch(`/api/alerts?user_id=${currentUser.id}`);
+                
+                if (response.ok) {
+                    // Session is valid, show main app
+                    showMainApp();
+                } else {
+                    // Session is invalid, clear and show login
+                    localStorage.removeItem('ranchFireAlertUser');
+                    currentUser = null;
+                    showUserCheck();
+                }
+            } catch (error) {
+                console.error('Session validation error:', error);
+                // On network error, still show main app (offline mode)
+                showMainApp();
+            }
+        }
     </script>
 </body>
 </html>
