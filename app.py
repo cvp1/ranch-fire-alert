@@ -27,19 +27,13 @@ CORS(app)
 # Configuration
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-key-change-in-production')
 
-# Database configuration with fallback
-database_url = os.getenv('DATABASE_URL')
-if database_url:
-    # Use PostgreSQL if DATABASE_URL is provided
-    app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-    logger.info("Using PostgreSQL database")
-else:
-    # Fallback to SQLite with persistent storage
-    data_dir = os.path.join(os.getcwd(), 'data')
-    os.makedirs(data_dir, exist_ok=True)
-    sqlite_path = os.path.join(data_dir, 'fire_alerts.db')
-    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{sqlite_path}'
-    logger.info(f"Using SQLite database at {sqlite_path}")
+# Database configuration - SQLite only
+data_dir = os.path.join(os.getcwd(), 'data')
+os.makedirs(data_dir, exist_ok=True)
+sqlite_path = os.path.join(data_dir, 'fire_alerts.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{sqlite_path}'
+logger.info(f"Using SQLite database at {sqlite_path}")
+logger.info("SQLite database will persist if using Railway volumes")
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
@@ -175,10 +169,19 @@ def get_config():
 
 @app.route('/api/status', methods=['GET'])
 def status():
+    # Get database info
+    db_uri = app.config['SQLALCHEMY_DATABASE_URI']
+    db_path = db_uri.replace('sqlite:///', '')
+    db_info = f"SQLite at {db_path}"
+    
     return jsonify({
         'status': 'running',
         'firebase_enabled': firebase_initialized,
         'database_connected': True,
+        'database_type': 'SQLite',
+        'database_info': db_info,
+        'database_url_set': False,  # Always false since we only use SQLite
+        'use_sqlite': True,  # Always true since we only use SQLite
         'https_enabled': request.is_secure,
         'config_loaded': bool(os.getenv('FIREBASE_API_KEY')),
         'timestamp': datetime.utcnow().isoformat()
@@ -914,7 +917,7 @@ def admin_database_status():
         
         # Get database info
         db_info = {
-            'type': 'PostgreSQL' if not app.config['SQLALCHEMY_DATABASE_URI'].startswith('sqlite') else 'SQLite',
+            'type': 'SQLite',
             'uri': app.config['SQLALCHEMY_DATABASE_URI'].replace('://', '://***:***@') if '@' in app.config['SQLALCHEMY_DATABASE_URI'] else app.config['SQLALCHEMY_DATABASE_URI'],
             'tables': [],
             'backups': []
@@ -1035,17 +1038,15 @@ def restore_database(backup_file):
     try:
         import shutil
         
-        if app.config['SQLALCHEMY_DATABASE_URI'].startswith('sqlite'):
-            # SQLite restore
-            target_db = app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
-            
-            if os.path.exists(backup_file):
-                shutil.copy2(backup_file, target_db)
-                logger.info(f"Database restored from: {backup_file}")
-                return True
+        # SQLite restore
+        target_db = app.config['SQLALCHEMY_DATABASE_URI'].replace('sqlite:///', '')
+        
+        if os.path.exists(backup_file):
+            shutil.copy2(backup_file, target_db)
+            logger.info(f"Database restored from: {backup_file}")
+            return True
         else:
-            # PostgreSQL restore (would need psql in production)
-            logger.info("PostgreSQL restore would require psql utility")
+            logger.error(f"Backup file not found: {backup_file}")
             return False
             
     except Exception as e:
@@ -1084,16 +1085,17 @@ def cleanup_old_backups(max_backups=10):
 def create_tables():
     with app.app_context():
         try:
-            # Test database connection
-            db.engine.execute("SELECT 1")
+            # Test database connection using SQLAlchemy 2.0+ syntax
+            with db.engine.connect() as conn:
+                conn.execute(db.text("SELECT 1"))
+                conn.commit()
             logger.info("Database connection successful")
         except Exception as e:
             logger.error(f"Database connection failed: {e}")
             return
         
         # Create backup before making changes
-        if app.config['SQLALCHEMY_DATABASE_URI'].startswith('sqlite'):
-            backup_database()
+        backup_database()
         
         db.create_all()
         

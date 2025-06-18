@@ -8,7 +8,9 @@ services:
       - FLASK_ENV=development
       - FLASK_DEBUG=false
       - SECRET_KEY=docker-dev-secret-key-change-in-production
-      - DATABASE_URL=postgresql://ranch_user:ranch_password@db:5432/ranch_alerts
+      # SQLite configuration (default)
+      - USE_SQLITE=true
+      - DATABASE_URL=
       - HOST=0.0.0.0
       - PORT=8088
       # Firebase configuration (update with your values)
@@ -29,33 +31,10 @@ services:
       - app_data:/app/data
       - app_backups:/app/data/backups
     depends_on:
-      - db
       - redis
     restart: unless-stopped
     networks:
       - ranch_network
-
-  # PostgreSQL database
-  db:
-    image: postgres:15-alpine
-    environment:
-      - POSTGRES_DB=ranch_alerts
-      - POSTGRES_USER=ranch_user
-      - POSTGRES_PASSWORD=ranch_password
-      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    ports:
-      - "5432:5432"
-    restart: unless-stopped
-    networks:
-      - ranch_network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ranch_user -d ranch_alerts"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
   # Redis for caching and sessions
   redis:
@@ -92,8 +71,6 @@ services:
       - production
 
 volumes:
-  postgres_data:
-    driver: local
   redis_data:
     driver: local
   app_data:

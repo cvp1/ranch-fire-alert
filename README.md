@@ -32,7 +32,7 @@ A Progressive Web App (PWA) emergency notification system designed specifically 
 
 - **Backend**: Python Flask with SQLAlchemy 2.0+
 - **Frontend**: Vanilla JavaScript with PWA features
-- **Database**: SQLite (development) / PostgreSQL (production)
+- **Database**: SQLite with persistent storage
 - **Push Notifications**: Firebase Cloud Messaging (FCM)
 - **Caching**: Service Worker with Cache API
 - **Authentication**: Simple email/phone-based system with optional passwords
@@ -54,6 +54,33 @@ The system is configured specifically for:
 
 ### Option 1: Docker Setup (Recommended)
 
+#### Quick Start with Docker Runner Script
+
+The easiest way to run the application is using the provided Docker runner script:
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/ranch-fire-alert.git
+cd ranch-fire-alert
+
+# Make the script executable
+chmod +x docker-run.sh
+
+# Start the application
+./docker-run.sh start
+
+# View logs
+./docker-run.sh logs
+
+# Stop containers
+./docker-run.sh stop
+
+# Show help
+./docker-run.sh help
+```
+
+#### Manual Docker Setup
+
 1. **Clone and start with Docker**:
    ```bash
    git clone https://github.com/yourusername/ranch-fire-alert.git
@@ -64,6 +91,30 @@ The system is configured specifically for:
 2. **Visit the application**:
    - Desktop: http://localhost:8088
    - Mobile: http://YOUR_IP:8088
+
+### Docker Configuration
+
+The application uses SQLite by default for simplicity and ease of deployment:
+
+- **Database**: SQLite with persistent storage
+- **Services**: Flask app + Redis
+- **Data persistence**: Docker volumes for database and backups
+- **Management**: Convenient `docker-run.sh` script
+
+#### Docker Runner Script (`docker-run.sh`)
+A convenient script that handles all Docker operations:
+
+```bash
+# Available commands:
+./docker-run.sh start      # Start the application
+./docker-run.sh stop       # Stop all containers
+./docker-run.sh clean      # Remove containers and volumes
+./docker-run.sh logs       # View logs
+./docker-run.sh status     # Show container status
+./docker-run.sh backup     # Create database backup
+./docker-run.sh restore    # Restore from backup
+./docker-run.sh help       # Show help
+```
 
 ### Option 2: Local Development
 
@@ -115,9 +166,8 @@ SECRET_KEY=your-secret-key-here
 HOST=0.0.0.0
 PORT=8088
 
-# Database
-DATABASE_URL=sqlite:///fire_alerts.db
-# For production: DATABASE_URL=postgresql://user:pass@host:5432/db
+# Database (SQLite only - no configuration needed)
+# Database file will be created at ./data/fire_alerts.db
 
 # Firebase (Optional - for push notifications)
 FIREBASE_API_KEY=your-api-key
@@ -152,7 +202,9 @@ ranch-fire-alert/
 ├── app.py                          # Main Flask application
 ├── requirements.txt                # Python dependencies
 ├── .env                           # Environment configuration
-├── docker-compose.yml             # Docker configuration
+├── docker-compose.yml             # Docker configuration (SQLite)
+├── docker-run.sh                  # Docker management script
+├── railway.json                   # Railway deployment configuration
 ├── templates/
 │   └── index.html                 # Main application UI
 ├── static/
@@ -190,21 +242,35 @@ ranch-fire-alert/
 
 ## 🚀 Production Deployment
 
-### Docker Production
-```bash
-# Use production profile
-docker-compose --profile production up -d
-```
+### Railway Deployment (Recommended)
 
-### Cloud Platforms
-1. **Railway**: Connect GitHub repo, auto-deploys
-2. **Heroku**: `git push heroku main`
-3. **DigitalOcean**: App Platform supports Flask
-4. **Render**: Connect GitHub, auto-deploy
+1. **Connect your GitHub repository** to Railway
+2. **Railway will automatically detect** the Flask app
+3. **Set environment variables** in Railway dashboard:
+   ```bash
+   SECRET_KEY=your-secret-key-here
+   FLASK_ENV=production
+   PORT=8088
+   HOST=0.0.0.0
+   ```
+4. **Create a volume** in Railway and mount it to `/app/data`
+5. **Deploy** - Railway will handle the rest!
+
+### Railway Configuration
+
+The `railway.json` file is already configured for optimal deployment:
+- **Health check**: `/api/status`
+- **Volume mount**: `/app/data` for database persistence
+- **Start command**: `python app.py`
+
+### Other Cloud Platforms
+1. **Heroku**: `git push heroku main`
+2. **DigitalOcean**: App Platform supports Flask
+3. **Render**: Connect GitHub, auto-deploy
 
 ### Production Checklist
 - [ ] HTTPS enabled (required for PWA features)
-- [ ] PostgreSQL database configured
+- [ ] SQLite database with proper backups
 - [ ] Firebase notifications configured
 - [ ] Environment variables set
 - [ ] SSL certificates installed
@@ -252,10 +318,19 @@ docker-compose logs -f web
 
 # Reset everything
 docker-compose down -v && docker-compose up -d
+
+# Using the runner script
+./docker-run.sh logs
+./docker-run.sh status
 ```
 
 **Port Conflicts**:
 - Change `PORT=8088` in .env file
+
+**Railway Issues**:
+- Ensure volume is mounted to `/app/data`
+- Check environment variables are set
+- Verify health check endpoint returns 200
 
 ### Development Mode
 
@@ -275,13 +350,13 @@ For full PWA features:
 
 ### Minimum Requirements
 - **Server**: 1 CPU, 512MB RAM
-- **Database**: SQLite (development) or PostgreSQL (production)
+- **Database**: SQLite with persistent storage
 - **Network**: HTTP/HTTPS access
 - **Browser**: Modern browser with Service Worker support
 
 ### Recommended for Production
 - **Server**: 2 CPU, 2GB RAM
-- **Database**: PostgreSQL with backups
+- **Database**: SQLite with regular backups
 - **Network**: HTTPS with valid SSL certificate
 - **CDN**: For static asset delivery
 - **Monitoring**: Application and database monitoring
@@ -328,214 +403,8 @@ If you encounter issues:
 - ✅ Fixed SQLAlchemy 2.0+ compatibility
 - ✅ Added Firebase service worker support
 - ✅ Improved error handling and validation
-- ✅ Added Docker support for easy deployment
+- ✅ Added Docker support with SQLite for easy deployment
 - ✅ Enhanced livestock coordination features
-
-## Database Persistence
-
-### PostgreSQL (Recommended for Production)
-
-The system is configured to use PostgreSQL by default for better reliability and data persistence:
-
-```bash
-# Using Docker Compose (recommended)
-docker-compose up -d
-
-# This will:
-# - Start PostgreSQL with persistent volumes
-# - Initialize the database with sample data
-# - Create admin user: admin@ranch.local / admin123
-```
-
-### SQLite (Development/Simple Deployment)
-
-For simple deployments, the system can fall back to SQLite:
-
-```bash
-# Set environment variable to disable PostgreSQL
-export DATABASE_URL=""
-
-# Run the application
-python app.py
-```
-
-## Quick Start
-
-### Prerequisites
-
-- Python 3.8+
-- Docker and Docker Compose (for production)
-- Firebase project (for push notifications)
-
-### Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd ranch-fire-alert
-   ```
-
-2. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. **Set up environment variables**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your Firebase configuration
-   ```
-
-4. **Run with Docker (recommended)**
-   ```bash
-   docker-compose up -d
-   ```
-
-5. **Or run locally**
-   ```bash
-   python app.py
-   ```
-
-6. **Access the application**
-   - Web: http://localhost:8088
-   - Admin: admin@ranch.local / admin123
-
-## Database Management
-
-### Automatic Backups
-
-The system automatically creates backups when:
-- Database schema changes are made
-- The application starts up (for SQLite)
-
-### Manual Backups
-
-Admins can create manual backups through the admin interface:
-1. Log in as admin
-2. Go to Admin tab
-3. Click "Database Status" to view current backups
-4. Click "Create Backup" to create a new backup
-
-### Backup Location
-
-- **SQLite**: `./data/backups/` directory
-- **PostgreSQL**: Requires `pg_dump` utility (not included in container)
-
-### Data Persistence
-
-#### Docker Volumes
-
-The following volumes ensure data persistence:
-
-```yaml
-volumes:
-  postgres_data:    # PostgreSQL database files
-  redis_data:       # Redis cache and sessions
-  app_data:         # Application data (SQLite, logs)
-  app_backups:      # Database backups
-```
-
-#### Backup Strategy
-
-- **Automatic**: Before schema changes
-- **Manual**: Via admin interface
-- **Retention**: Keeps last 10 backups
-- **Location**: `./data/backups/` directory
-
-## Deployment
-
-### Production Deployment
-
-1. **Update environment variables**
-   ```bash
-   # Production settings
-   export FLASK_ENV=production
-   export SECRET_KEY=your-secure-secret-key
-   export DATABASE_URL=postgresql://user:pass@host:port/db
-   ```
-
-2. **Deploy with Docker Compose**
-   ```bash
-   docker-compose -f docker-compose.yml --profile production up -d
-   ```
-
-3. **Set up SSL/HTTPS** (required for PWA features)
-   ```bash
-   # Configure nginx with SSL certificates
-   # Update nginx.conf with your domain
-   ```
-
-### Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | SQLite fallback |
-| `SECRET_KEY` | Flask secret key | dev-key-change-in-production |
-| `FLASK_ENV` | Flask environment | development |
-| `FIREBASE_API_KEY` | Firebase API key | demo key |
-| `FIREBASE_PROJECT_ID` | Firebase project ID | dmr-fns |
-
-## Troubleshooting
-
-### Database Issues
-
-**Problem**: Data is lost after deployment
-**Solution**: 
-- Ensure Docker volumes are properly mounted
-- Check that `DATABASE_URL` is set correctly
-- Verify PostgreSQL container is running: `docker-compose ps`
-
-**Problem**: Database connection errors
-**Solution**:
-- Check PostgreSQL logs: `docker-compose logs db`
-- Verify network connectivity between containers
-- Ensure database credentials are correct
-
-### Session Issues
-
-**Problem**: Users get logged out on page refresh
-**Solution**: 
-- Check browser localStorage support
-- Verify session validation is working
-- Check for JavaScript errors in browser console
-
-## Development
-
-### Local Development
-
-```bash
-# Start development environment
-docker-compose up -d
-
-# View logs
-docker-compose logs -f web
-
-# Access database
-docker-compose exec db psql -U ranch_user -d ranch_alerts
-
-# Run tests
-python -m pytest tests/
-```
-
-### Database Migrations
-
-The system automatically handles schema migrations. For manual migrations:
-
-```bash
-# Create backup before changes
-curl -X POST "http://localhost:8088/api/admin/database/backup?user_id=1"
-
-# Check database status
-curl "http://localhost:8088/api/admin/database/status?user_id=1"
-```
-
-## Security
-
-- All admin functions require admin privileges
-- Database backups are stored securely
-- Session validation prevents unauthorized access
-- Input validation on all API endpoints
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+- ✅ Simplified database setup with SQLite-only configuration
+- ✅ Railway deployment with volume persistence
+- ✅ Streamlined Docker management with runner script
