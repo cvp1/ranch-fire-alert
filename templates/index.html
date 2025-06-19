@@ -470,6 +470,11 @@
             font-weight: bold;
             color: #d32f2f;
         }
+        
+        .modal { position: fixed; z-index: 1000; left: 0; top: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; }
+        .modal.hidden { display: none; }
+        .modal-content { min-width: 320px; max-width: 95vw; position: relative; }
+        .close { position: absolute; right: 18px; top: 12px; font-size: 28px; color: #B22222; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -591,6 +596,7 @@
                 <button class="tab active" onclick="showTab('alerts')">🔥 Alerts</button>
                 <button class="tab" onclick="showTab('livestock')">🐄 Livestock</button>
                 <button class="tab" onclick="showTab('admin')" id="adminTabBtn" style="display:none;">⚙️ Admin</button>
+                <button class="tab" onclick="showTab('users')" id="usersTabBtn" style="display:none;">👤 Users</button>
             </div>
 
             <!-- Alerts Tab -->
@@ -728,10 +734,53 @@
                 </div>
             </div>
 
+            <!-- Users Tab -->
+            <div id="usersTab" class="hidden">
+                <div class="card">
+                    <h3>👤 User Management</h3>
+                    <div id="usersList">
+                        <p>Loading users...</p>
+                    </div>
+                    <button class="btn btn-success" onclick="showAddUserModal()">Add User</button>
+                </div>
+            </div>
+
             <!-- Logout -->
             <div class="logout-section">
                 <button class="btn btn-secondary" onclick="logout()">Sign Out</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit User Modal -->
+    <div id="userModal" class="modal hidden">
+        <div class="modal-content card">
+            <span class="close" onclick="closeUserModal()">&times;</span>
+            <h3 id="userModalTitle">Add User</h3>
+            <div class="form-group">
+                <label for="userName">Full Name *</label>
+                <input type="text" id="userName" required>
+            </div>
+            <div class="form-group">
+                <label for="userEmail">Email</label>
+                <input type="email" id="userEmail">
+            </div>
+            <div class="form-group">
+                <label for="userPhone">Phone</label>
+                <input type="tel" id="userPhone">
+            </div>
+            <div class="form-group">
+                <label for="userPassword">Password</label>
+                <input type="password" id="userPassword" placeholder="Leave blank to keep unchanged">
+            </div>
+            <div class="form-group">
+                <label for="userRanch">Ranch *</label>
+                <select id="userRanch"></select>
+            </div>
+            <div class="form-group">
+                <label for="userIsAdmin"><input type="checkbox" id="userIsAdmin"> Admin</label>
+            </div>
+            <button class="btn btn-success" id="userModalSaveBtn" onclick="saveUser()">Save</button>
         </div>
     </div>
 
@@ -1255,6 +1304,7 @@
                 // Show admin tab if user is admin
                 if (currentUser.is_admin) {
                     document.getElementById('adminTabBtn').style.display = 'block';
+                    document.getElementById('usersTabBtn').style.display = 'block';
                 }
             }
             
@@ -1276,6 +1326,7 @@
             document.getElementById('alertsTab').classList.add('hidden');
             document.getElementById('livestockTab').classList.add('hidden');
             document.getElementById('adminTab').classList.add('hidden');
+            document.getElementById('usersTab').classList.add('hidden');
             
             // Remove active class from all tab buttons
             document.querySelectorAll('.tab').forEach(tab => {
@@ -1292,6 +1343,8 @@
                 loadLivestockRequests();
             } else if (tabName === 'admin') {
                 loadAdminStats();
+            } else if (tabName === 'users') {
+                loadUsers();
             }
         }
 
@@ -2050,6 +2103,150 @@
                 showError('Failed to create backup: ' + error.message);
             }
         }
+
+        // --- User Management Functions ---
+        async function loadUsers() {
+            const usersList = document.getElementById('usersList');
+            usersList.innerHTML = '<p>Loading users...</p>';
+            try {
+                const response = await fetch(`/api/admin/users?user_id=${currentUser.id}`);
+                const result = await response.json();
+                if (result.success) {
+                    if (result.users.length === 0) {
+                        usersList.innerHTML = '<p>No users found.</p>';
+                        return;
+                    }
+                    let table = `<table class="alert-table"><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Ranch</th><th>Admin</th><th>Actions</th></tr></thead><tbody>`;
+                    for (const user of result.users) {
+                        table += `<tr>
+                            <td>${user.name}</td>
+                            <td>${user.email || ''}</td>
+                            <td>${user.phone || ''}</td>
+                            <td>${user.ranch_id || ''}</td>
+                            <td>${user.is_admin ? 'Yes' : 'No'}</td>
+                            <td>
+                                <button class='btn btn-secondary' onclick='showEditUserModal(${user.id})'>Edit</button>
+                                <button class='btn btn-danger' onclick='deleteUser(${user.id})'>Delete</button>
+                            </td>
+                        </tr>`;
+                    }
+                    table += '</tbody></table>';
+                    usersList.innerHTML = table;
+                } else {
+                    usersList.innerHTML = `<p style='color:#B22222;'>${result.error || 'Failed to load users.'}</p>`;
+                }
+            } catch (error) {
+                usersList.innerHTML = `<p style='color:#B22222;'>Error loading users: ${error.message}</p>`;
+            }
+        }
+
+        // --- User Management Modal Logic ---
+        let editingUserId = null;
+        function showAddUserModal() {
+            editingUserId = null;
+            document.getElementById('userModalTitle').textContent = 'Add User';
+            document.getElementById('userName').value = '';
+            document.getElementById('userEmail').value = '';
+            document.getElementById('userPhone').value = '';
+            document.getElementById('userPassword').value = '';
+            document.getElementById('userIsAdmin').checked = false;
+            loadRanchOptions('userRanch');
+            document.getElementById('userModal').classList.remove('hidden');
+        }
+        async function showEditUserModal(userId) {
+            editingUserId = userId;
+            document.getElementById('userModalTitle').textContent = 'Edit User';
+            document.getElementById('userPassword').value = '';
+            loadRanchOptions('userRanch');
+            try {
+                const response = await fetch(`/api/admin/users?user_id=${currentUser.id}`);
+                const result = await response.json();
+                if (result.success) {
+                    const user = result.users.find(u => u.id === userId);
+                    if (!user) return;
+                    document.getElementById('userName').value = user.name || '';
+                    document.getElementById('userEmail').value = user.email || '';
+                    document.getElementById('userPhone').value = user.phone || '';
+                    document.getElementById('userIsAdmin').checked = !!user.is_admin;
+                    document.getElementById('userRanch').value = user.ranch_id || '';
+                    document.getElementById('userModal').classList.remove('hidden');
+                }
+            } catch {}
+        }
+        function closeUserModal() {
+            document.getElementById('userModal').classList.add('hidden');
+        }
+        async function saveUser() {
+            const name = document.getElementById('userName').value.trim();
+            const email = document.getElementById('userEmail').value.trim();
+            const phone = document.getElementById('userPhone').value.trim();
+            const password = document.getElementById('userPassword').value;
+            const ranch_id = document.getElementById('userRanch').value;
+            const is_admin = document.getElementById('userIsAdmin').checked;
+            if (!name || !ranch_id) {
+                alert('Name and Ranch are required.');
+                return;
+            }
+            const payload = { name, email, phone, password, ranch_id, is_admin };
+            let url = '/api/admin/users', method = 'POST';
+            if (editingUserId) {
+                url = `/api/admin/users/${editingUserId}`;
+                method = 'PUT';
+            }
+            try {
+                const response = await fetch(url + `?user_id=${currentUser.id}`, {
+                    method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+                if (result.success) {
+                    closeUserModal();
+                    loadUsers();
+                } else {
+                    alert(result.error || 'Failed to save user.');
+                }
+            } catch (error) {
+                alert('Error saving user: ' + error.message);
+            }
+        }
+        async function deleteUser(userId) {
+            if (!confirm('Delete this user?')) return;
+            try {
+                const response = await fetch(`/api/admin/users/${userId}?user_id=${currentUser.id}`, { method: 'DELETE' });
+                const result = await response.json();
+                if (result.success) {
+                    loadUsers();
+                } else {
+                    alert(result.error || 'Failed to delete user.');
+                }
+            } catch (error) {
+                alert('Error deleting user: ' + error.message);
+            }
+        }
+        async function loadRanchOptions(selectId) {
+            const select = document.getElementById(selectId);
+            select.innerHTML = '<option value="">Loading...</option>';
+            try {
+                const response = await fetch('/api/ranches');
+                const result = await response.json();
+                if (result.success) {
+                    select.innerHTML = '';
+                    for (const ranch of result.ranches) {
+                        select.innerHTML += `<option value="${ranch.id}">${ranch.name}</option>`;
+                    }
+                } else {
+                    select.innerHTML = '<option value="">Failed to load ranches</option>';
+                }
+            } catch {
+                select.innerHTML = '<option value="">Failed to load ranches</option>';
+            }
+        }
+
+        window.showEditUserModal = showEditUserModal;
+        window.showAddUserModal = showAddUserModal;
+        window.deleteUser = deleteUser;
+        window.closeUserModal = closeUserModal;
     </script>
 </body>
 </html>

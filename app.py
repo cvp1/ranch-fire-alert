@@ -1212,6 +1212,152 @@ def create_tables():
         
         logger.info("Database initialization completed successfully")
 
+# --- User Management (Admin) ---
+@app.route('/api/admin/users', methods=['GET'])
+def admin_list_users():
+    """List all users (admin only)"""
+    try:
+        user_id = request.args.get('user_id')
+        user = db.session.get(User, user_id)
+        if not user or not user.is_admin:
+            return jsonify({'success': False, 'error': 'Admin access required'}), 403
+        users = User.query.order_by(User.created_at.desc()).all()
+        user_list = []
+        for u in users:
+            user_list.append({
+                'id': u.id,
+                'name': u.name,
+                'email': u.email,
+                'phone': u.phone,
+                'ranch_id': u.ranch_id,
+                'is_admin': u.is_admin,
+                'last_login': u.last_login.isoformat() if u.last_login else None,
+                'created_at': u.created_at.isoformat() if u.created_at else None
+            })
+        return jsonify({'success': True, 'users': user_list})
+    except Exception as e:
+        logger.error(f"List users error: {e}")
+        return jsonify({'success': False, 'error': f'Failed to list users: {str(e)}'}), 500
+
+@app.route('/api/admin/users', methods=['POST'])
+def admin_add_user():
+    """Add a new user (admin only)"""
+    try:
+        user_id = request.args.get('user_id')
+        admin_user = db.session.get(User, user_id)
+        if not admin_user or not admin_user.is_admin:
+            return jsonify({'success': False, 'error': 'Admin access required'}), 403
+        data = request.get_json()
+        name = data.get('name', '').strip()
+        email = data.get('email', '').strip() or None
+        phone = data.get('phone', '').strip() or None
+        password = data.get('password', '').strip() or None
+        ranch_id = data.get('ranch_id')
+        is_admin = bool(data.get('is_admin', False))
+        if not name or (not email and not phone) or not ranch_id:
+            return jsonify({'success': False, 'error': 'Name, ranch, and email or phone required'}), 400
+        # Check for existing user
+        if email and User.query.filter_by(email=email.lower()).first():
+            return jsonify({'success': False, 'error': 'Email already in use'}), 400
+        if phone and User.query.filter_by(phone=phone).first():
+            return jsonify({'success': False, 'error': 'Phone already in use'}), 400
+        ranch = db.session.get(Ranch, ranch_id)
+        if not ranch:
+            return jsonify({'success': False, 'error': 'Invalid ranch'}), 400
+        user = User(
+            name=name,
+            email=email.lower() if email else None,
+            phone=phone,
+            password_hash=simple_hash(password) if password else None,
+            ranch_id=ranch_id,
+            is_admin=is_admin
+        )
+        db.session.add(user)
+        db.session.commit()
+        return jsonify({'success': True, 'user': {
+            'id': user.id,
+            'name': user.name,
+            'email': user.email,
+            'phone': user.phone,
+            'ranch_id': user.ranch_id,
+            'is_admin': user.is_admin,
+            'created_at': user.created_at.isoformat() if user.created_at else None
+        }})
+    except Exception as e:
+        logger.error(f"Add user error: {e}")
+        db.session.rollback()
+        return jsonify({'success': False, 'error': f'Failed to add user: {str(e)}'}), 500
+
+@app.route('/api/admin/users/<int:edit_user_id>', methods=['PUT'])
+def admin_edit_user(edit_user_id):
+    """Edit a user (admin only)"""
+    try:
+        user_id = request.args.get('user_id')
+        admin_user = db.session.get(User, user_id)
+        if not admin_user or not admin_user.is_admin:
+            return jsonify({'success': False, 'error': 'Admin access required'}), 403
+        data = request.get_json()
+        user = db.session.get(User, edit_user_id)
+        if not user:
+            return jsonify({'success': False, 'error': 'User not found'}), 404
+        name = data.get('name', '').strip()
+        email = data.get('email', '').strip() or None
+        phone = data.get('phone', '').strip() or None
+        password = data.get('password', '').strip() or None
+        ranch_id = data.get('ranch_id')
+        is_admin = bool(data.get('is_admin', user.is_admin))
+        if name:
+            user.name = name
+        if email:
+            if email.lower() != user.email and User.query.filter_by(email=email.lower()).first():
+                return jsonify({'success': False, 'error': 'Email already in use'}), 400
+            user.email = email.lower()
+        if phone:
+            if phone != user.phone and User.query.filter_by(phone=phone).first():
+                return jsonify({'success': False, 'error': 'Phone already in use'}), 400
+            user.phone = phone
+        if password:
+            user.password_hash = simple_hash(password)
+        if ranch_id:
+            ranch = db.session.get(Ranch, ranch_id)
+            if not ranch:
+                return jsonify({'success': False, 'error': 'Invalid ranch'}), 400
+            user.ranch_id = ranch_id
+        user.is_admin = is_admin
+        db.session.commit()
+        return jsonify({'success': True, 'user': {
+            'id': user.id,
+            'name': user.name,
+            'email': user.email,
+            'phone': user.phone,
+            'ranch_id': user.ranch_id,
+            'is_admin': user.is_admin,
+            'created_at': user.created_at.isoformat() if user.created_at else None
+        }})
+    except Exception as e:
+        logger.error(f"Edit user error: {e}")
+        db.session.rollback()
+        return jsonify({'success': False, 'error': f'Failed to edit user: {str(e)}'}), 500
+
+@app.route('/api/admin/users/<int:delete_user_id>', methods=['DELETE'])
+def admin_delete_user(delete_user_id):
+    """Delete a user (admin only)"""
+    try:
+        user_id = request.args.get('user_id')
+        admin_user = db.session.get(User, user_id)
+        if not admin_user or not admin_user.is_admin:
+            return jsonify({'success': False, 'error': 'Admin access required'}), 403
+        user = db.session.get(User, delete_user_id)
+        if not user:
+            return jsonify({'success': False, 'error': 'User not found'}), 404
+        db.session.delete(user)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'User deleted'})
+    except Exception as e:
+        logger.error(f"Delete user error: {e}")
+        db.session.rollback()
+        return jsonify({'success': False, 'error': f'Failed to delete user: {str(e)}'}), 500
+
 if __name__ == '__main__':
     create_tables()
     
