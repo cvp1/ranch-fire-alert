@@ -3,16 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ranch Fire Alert System</title>
+    <title>DMR Alert System</title>
     
     <!-- PWA Meta Tags -->
     <link rel="manifest" href="/static/manifest.json">
-    <meta name="theme-color" content="#d32f2f">
+    <meta name="theme-color" content="#CD853F">
     <link rel="icon" href="/static/icons/icon-192.png">
     <meta name="mobile-web-app-capable" content="yes">
+    
+    <!-- iOS Specific Meta Tags -->
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Fire Alert">
+    <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+    <link rel="apple-touch-startup-image" href="/static/icons/icon-512.png">
+    
     <meta name="description" content="Emergency fire notification system for ranch communities">
     
     <style>
@@ -24,7 +29,7 @@
         
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            background: linear-gradient(135deg, #FAF3E3, #F5DEB3);
             min-height: 100vh;
             color: #333;
         }
@@ -40,6 +45,11 @@
             text-align: center;
             color: white;
             margin-bottom: 30px;
+        }
+        
+        .header h1, .header p {
+            color: #6B4423;
+            text-shadow: 0 2px 8px rgba(250, 243, 227, 0.25);
         }
         
         .header h1 {
@@ -113,7 +123,7 @@
         }
         
         .btn {
-            background: #d32f2f;
+            background: #CD853F;
             color: white;
             border: none;
             padding: 12px 20px;
@@ -127,7 +137,7 @@
         }
         
         .btn:hover {
-            background: #b71c1c;
+            background: #A0522D;
         }
         
         .btn:disabled {
@@ -136,27 +146,27 @@
         }
         
         .btn-secondary {
-            background: #1976d2;
+            background: #8B7355;
         }
         
         .btn-secondary:hover {
-            background: #1565c0;
+            background: #6B4423;
         }
         
         .btn-success {
-            background: #388e3c;
+            background: #CD853F;
         }
         
         .btn-success:hover {
-            background: #2e7d32;
+            background: #B8860B;
         }
         
         .btn-danger {
-            background: #d32f2f;
+            background: #B22222;
         }
         
         .btn-danger:hover {
-            background: #b71c1c;
+            background: #8B0000;
         }
         
         .form-group {
@@ -183,8 +193,8 @@
         .form-group select:focus,
         .form-group textarea:focus {
             outline: none;
-            border-color: #d32f2f;
-            box-shadow: 0 0 0 2px rgba(211, 47, 47, 0.1);
+            border-color: #CD853F;
+            box-shadow: 0 0 0 2px rgba(205, 133, 63, 0.1);
         }
         
         .form-group textarea {
@@ -332,7 +342,7 @@
         }
         
         .install-prompt {
-            background: #4caf50;
+            background: #CD853F;
             color: white;
             padding: 15px;
             border-radius: 8px;
@@ -466,7 +476,7 @@
     <div class="container">
         <!-- Header -->
         <div class="header">
-            <h1>🔥 Ranch Fire Alert</h1>
+            <h1>🔥 DMR Fire Alert</h1>
             <p>Emergency Communication System</p>
         </div>
 
@@ -481,7 +491,7 @@
 
         <!-- Install Prompt (PWA) -->
         <div id="installPrompt" class="install-prompt hidden">
-            <p><strong>📱 Install this app</strong></p>
+            <p><strong>🏜️ Add to Home Screen</strong></p>
             <p>Add to your home screen for quick access and offline use</p>
             <button class="btn btn-success" onclick="installPWA()">Install App</button>
         </div>
