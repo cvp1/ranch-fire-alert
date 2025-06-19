@@ -2247,6 +2247,29 @@
         window.showAddUserModal = showAddUserModal;
         window.deleteUser = deleteUser;
         window.closeUserModal = closeUserModal;
+
+        // --- iOS/Safari Install Banner Logic ---
+        function isIos() {
+            return /iphone|ipad|ipod/i.test(navigator.userAgent);
+        }
+        function isInStandaloneMode() {
+            return (window.navigator.standalone === true) || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+        }
+        function isSafari() {
+            return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+        }
+        function maybeShowIosInstallBanner() {
+            if (isIos() && isSafari() && !isInStandaloneMode()) {
+                if (!localStorage.getItem('iosInstallBannerDismissed')) {
+                    document.getElementById('iosInstallBanner').classList.remove('hidden');
+                }
+            }
+        }
+        function dismissIosBanner() {
+            document.getElementById('iosInstallBanner').classList.add('hidden');
+            localStorage.setItem('iosInstallBannerDismissed', '1');
+        }
+        document.addEventListener('DOMContentLoaded', maybeShowIosInstallBanner);
     </script>
 </body>
 </html>
