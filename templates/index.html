@@ -9,13 +9,15 @@
     <link rel="manifest" href="/static/manifest.json">
     <meta name="theme-color" content="#CD853F">
     <link rel="icon" href="/static/icons/icon-192.png">
+    <link rel="shortcut icon" href="/favicon.ico">
     <meta name="mobile-web-app-capable" content="yes">
     
     <!-- iOS Specific Meta Tags -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Fire Alert">
-    <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link rel="apple-touch-icon-precomposed" href="/apple-touch-icon-precomposed.png">
     <link rel="apple-touch-startup-image" href="/static/icons/icon-512.png">
     
     <meta name="description" content="Emergency fire notification system for ranch communities">
@@ -240,19 +242,39 @@
         
         .tab {
             flex: 1;
+            background: #f5f5f5;
+            border: none;
             padding: 15px 8px;
             text-align: center;
-            background: #f5f5f5;
             cursor: pointer;
-            border: none;
             font-size: 13px;
             font-weight: 500;
             transition: all 0.3s ease;
+            border-radius: 8px 8px 0 0;
+            margin-right: 4px;
+            position: relative;
         }
         
         .tab.active {
+            background: #CD853F;
+            color: white;
+        }
+        
+        .tab-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
             background: #d32f2f;
             color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            min-width: 20px;
         }
         
         .tab:hover {
@@ -705,6 +727,7 @@
                     <div id="adminStats">
                         <p>Loading statistics...</p>
                     </div>
+                    <button class="btn btn-secondary" onclick="testNotification()">🔔 Test Notification</button>
                 </div>
                 
                 <div class="card">
@@ -864,6 +887,9 @@
             
             // Set up periodic tasks
             setInterval(checkConnection, 10000);
+            
+            // Set up periodic alert checking
+            setInterval(checkForNewAlerts, 30000); // Check every 30 seconds
         });
 
         // Load configuration from backend
@@ -922,7 +948,7 @@
                 const notificationOptions = {
                     body: payload.notification?.body || 'New alert received',
                     icon: '/static/icons/icon-192.png',
-                    badge: '/static/icons/icon-72.png',
+                    badge: '/static/icons/icon-192.png',
                     tag: 'fire-alert',
                     requireInteraction: true
                 };
@@ -940,18 +966,25 @@
 
         // Request notification permission and get token
         async function requestNotificationPermission() {
+            console.log('requestNotificationPermission started');
+            
             if (!window.getFirebaseToken) {
                 console.log('Firebase not available - skipping notification setup');
                 return null;
             }
             
             try {
+                console.log('Loading config to get VAPID key...');
                 // Load config to get VAPID key
                 const response = await fetch('/api/config');
                 const config = await response.json();
+                console.log('Config loaded, VAPID key available:', !!config.vapidKey);
                 
                 if (config.vapidKey && config.vapidKey !== 'demo-vapid-key') {
-                    return await window.getFirebaseToken(config.vapidKey);
+                    console.log('Getting Firebase token...');
+                    const token = await window.getFirebaseToken(config.vapidKey);
+                    console.log('Firebase token received:', token ? 'yes' : 'no');
+                    return token;
                 } else {
                     console.log('VAPID key not configured - skipping notifications');
                     return null;
@@ -1067,6 +1100,22 @@
                 loading.classList.add('hidden');
             }
         }
+        
+        function showLoading(loadingId, buttonId) {
+            const btn = document.getElementById(buttonId);
+            const loading = document.getElementById(loadingId);
+            
+            if (btn) btn.classList.add('hidden');
+            if (loading) loading.classList.remove('hidden');
+        }
+        
+        function hideLoading(loadingId, buttonId) {
+            const btn = document.getElementById(buttonId);
+            const loading = document.getElementById(loadingId);
+            
+            if (btn) btn.classList.remove('hidden');
+            if (loading) loading.classList.add('hidden');
+        }
 
         // Authentication functions
         function showUserCheck() {
@@ -1134,32 +1183,55 @@
         }
 
         async function login() {
-            const identifier = currentUser?.email || currentUser?.phone || document.getElementById('userIdentifier').value.trim();
+            console.log('Login function started');
             const password = document.getElementById('loginPassword').value;
             
-            setLoading('loginBtn', true);
+            // Get identifier from the user check form since currentUser might not be set yet
+            const identifier = document.getElementById('userIdentifier').value.trim();
+            
+            if (!identifier) {
+                showError('Please enter your email or phone number');
+                return;
+            }
             
             try {
-                // Get FCM token for notifications
-                const fcmToken = await requestNotificationPermission();
+                console.log('Showing loading state...');
+                showLoading('loginLoading', 'loginBtn');
                 
+                console.log('Making login request...');
                 const response = await fetch('/api/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        identifier, 
-                        password,
-                        fcm_token: fcmToken
+                    body: JSON.stringify({
+                        identifier: identifier,
+                        password: password,
+                        fcm_token: null // Skip FCM token for now
                     })
                 });
                 
+                console.log('Login response received, status:', response.status);
+                
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`);
+                }
+                
                 const result = await response.json();
+                console.log('Login result:', result.success ? 'success' : 'failed');
                 
                 if (result.success) {
+                    console.log('Login successful, updating user data...');
                     currentUser = result.user;
-                    // Save user session to localStorage
                     localStorage.setItem('ranchFireAlertUser', JSON.stringify(currentUser));
-                    showSuccess('Login successful!');
+                    
+                    // Request notification permission
+                    if ('Notification' in window && Notification.permission === 'default') {
+                        console.log('Requesting notification permission...');
+                        Notification.requestPermission().then(permission => {
+                            console.log('Notification permission:', permission);
+                        });
+                    }
+                    
+                    console.log('Showing main app...');
                     showMainApp();
                 } else {
                     throw new Error(result.error || 'Login failed');
@@ -1169,7 +1241,8 @@
                 console.error('Login error:', error);
                 showError('Login failed: ' + error.message);
             } finally {
-                setLoading('loginBtn', false);
+                console.log('Login function finished, hiding loading state...');
+                hideLoading('loginLoading', 'loginBtn');
             }
         }
 
@@ -1292,32 +1365,36 @@
 
         // Main application functions
         function showMainApp() {
-            hideAllForms();
+            document.getElementById('userCheckForm').classList.add('hidden');
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('registrationForm').classList.add('hidden');
             document.getElementById('mainApp').classList.remove('hidden');
             
             // Update user info
-            if (currentUser) {
-                document.getElementById('userName').textContent = currentUser.name;
-                document.getElementById('userDetails').textContent = 
-                    `${currentUser.email || currentUser.phone} • ${currentUser.ranch_name}`;
-                
-                // Show admin tab if user is admin
-                if (currentUser.is_admin) {
-                    document.getElementById('adminTabBtn').style.display = 'block';
-                    document.getElementById('usersTabBtn').style.display = 'block';
-                }
+            document.getElementById('userName').textContent = currentUser.name;
+            document.getElementById('userDetails').textContent = `${currentUser.email || currentUser.phone} • ${currentUser.ranch_name || 'Unknown Ranch'}`;
+            
+            // Show admin tabs if user is admin
+            if (currentUser.is_admin) {
+                document.getElementById('adminTabBtn').style.display = 'block';
+                document.getElementById('usersTabBtn').style.display = 'block';
             }
             
+            // Load initial data
             loadAlerts();
             loadLivestockRequests();
             
-            // Set up periodic refresh
-            setInterval(() => {
-                if (!document.getElementById('mainApp').classList.contains('hidden')) {
-                    loadAlerts();
-                    loadLivestockRequests();
-                }
-            }, 30000);
+            // Start periodic alert checking
+            console.log('Starting periodic alert checking...');
+            setInterval(checkForNewAlerts, 30000); // Check every 30 seconds
+            
+            // Request notification permission if not already granted
+            if ('Notification' in window && Notification.permission === 'default') {
+                console.log('Requesting notification permission on app start...');
+                Notification.requestPermission().then(permission => {
+                    console.log('Notification permission result:', permission);
+                });
+            }
         }
 
         // Tab navigation
@@ -1339,7 +1416,10 @@
             // Add active class to clicked tab
             event.target.classList.add('active');
             
-            if (tabName === 'livestock') {
+            // Load appropriate data for each tab
+            if (tabName === 'alerts') {
+                loadAlerts();
+            } else if (tabName === 'livestock') {
                 loadLivestockRequests();
             } else if (tabName === 'admin') {
                 loadAdminStats();
@@ -1363,6 +1443,11 @@
                 if (result.success) {
                     displayAlerts(result.alerts);
                     updateAlertStats(result.alerts);
+                    
+                    // Set the baseline alert count for notifications
+                    const activeAlerts = result.alerts.filter(alert => alert.status === 'active');
+                    lastAlertCount = activeAlerts.length;
+                    console.log(`Initial alert count set to: ${lastAlertCount}`);
                 } else {
                     throw new Error(result.error || 'Failed to load alerts');
                 }
@@ -1370,6 +1455,19 @@
                 console.error('Error loading alerts:', error);
                 showError('Failed to load alerts: ' + error.message);
             }
+        }
+        
+        // Test notification function (for debugging)
+        function testNotification() {
+            console.log('Testing notification...');
+            const testAlert = {
+                id: 'test',
+                title: 'Test Alert',
+                message: 'This is a test notification to verify the system is working.',
+                severity: 'medium',
+                status: 'active'
+            };
+            showSystemNotification(testAlert);
         }
 
         function displayAlerts(alerts) {
@@ -1422,6 +1520,58 @@
             document.getElementById('totalAlerts').textContent = totalAlerts;
             document.getElementById('activeAlerts').textContent = activeAlerts;
             document.getElementById('criticalAlerts').textContent = criticalAlerts;
+            
+            // Update tab badges
+            updateTabBadges(alerts);
+        }
+        
+        function updateTabBadges(alerts) {
+            // Update alerts tab badge
+            const alertsTab = document.querySelector('.tab[onclick="showTab(\'alerts\')"]');
+            const activeAlerts = alerts.filter(alert => alert.status === 'active').length;
+            
+            if (alertsTab) {
+                // Remove existing badge
+                const existingBadge = alertsTab.querySelector('.tab-badge');
+                if (existingBadge) {
+                    existingBadge.remove();
+                }
+                
+                // Add new badge if there are active alerts
+                if (activeAlerts > 0) {
+                    const badge = document.createElement('span');
+                    badge.className = 'tab-badge';
+                    badge.textContent = activeAlerts;
+                    alertsTab.appendChild(badge);
+                }
+            }
+            
+            // Update document title and favicon badge
+            updateDocumentBadge(activeAlerts);
+        }
+        
+        function updateDocumentBadge(alertCount) {
+            // Update document title
+            if (alertCount > 0) {
+                document.title = `(${alertCount}) 🔥 DMR Fire Alert`;
+            } else {
+                document.title = '🔥 DMR Fire Alert';
+            }
+            
+            // Update favicon badge (if supported)
+            if ('setAppBadge' in navigator) {
+                navigator.setAppBadge(alertCount).catch(error => {
+                    console.log('App badge not supported:', error);
+                });
+            }
+            
+            // Update service worker badge if available
+            if (swRegistration && swRegistration.active) {
+                swRegistration.active.postMessage({
+                    type: 'UPDATE_BADGE',
+                    count: alertCount
+                });
+            }
         }
 
         // Livestock functions
@@ -2294,6 +2444,104 @@
             localStorage.setItem('iosInstallBannerDismissed', '1');
         }
         document.addEventListener('DOMContentLoaded', maybeShowIosInstallBanner);
+
+        // Check for new alerts periodically
+        let lastAlertCount = 0;
+        async function checkForNewAlerts() {
+            if (!currentUser) {
+                console.log('No current user, skipping alert check');
+                return;
+            }
+            
+            console.log('Checking for new alerts...');
+            
+            try {
+                const response = await fetch(`/api/alerts?user_id=${currentUser.id}`);
+                const result = await response.json();
+                
+                if (result.success) {
+                    const activeAlerts = result.alerts.filter(alert => alert.status === 'active');
+                    const currentAlertCount = activeAlerts.length;
+                    
+                    console.log(`Current alerts: ${currentAlertCount}, Last count: ${lastAlertCount}`);
+                    
+                    // If we have new alerts and the app is not focused, show notification
+                    if (currentAlertCount > lastAlertCount && !document.hasFocus()) {
+                        console.log(`New alerts detected! Showing ${currentAlertCount - lastAlertCount} notifications`);
+                        const newAlerts = activeAlerts.slice(0, currentAlertCount - lastAlertCount);
+                        
+                        newAlerts.forEach(alert => {
+                            showSystemNotification(alert);
+                        });
+                    }
+                    
+                    lastAlertCount = currentAlertCount;
+                    
+                    // Update badges even if we don't show notifications
+                    updateDocumentBadge(currentAlertCount);
+                }
+            } catch (error) {
+                console.error('Error checking for new alerts:', error);
+            }
+        }
+        
+        // Show system notification
+        function showSystemNotification(alert) {
+            console.log('Attempting to show system notification for alert:', alert);
+            
+            if (!('Notification' in window)) {
+                console.log('Notifications not supported in this browser');
+                return;
+            }
+            
+            console.log('Notification permission:', Notification.permission);
+            
+            if (Notification.permission === 'default') {
+                console.log('Requesting notification permission...');
+                Notification.requestPermission().then(permission => {
+                    console.log('Permission granted:', permission);
+                    if (permission === 'granted') {
+                        createNotification(alert);
+                    }
+                });
+                return;
+            }
+            
+            if (Notification.permission !== 'granted') {
+                console.log('Notification permission denied');
+                return;
+            }
+            
+            createNotification(alert);
+        }
+        
+        function createNotification(alert) {
+            console.log('Creating notification for alert:', alert.title);
+            
+            const notification = new Notification(`🔥 ${alert.severity.toUpperCase()} Alert`, {
+                body: alert.message,
+                icon: '/static/icons/icon-192.png',
+                badge: '/static/icons/icon-192.png',
+                tag: `alert-${alert.id}`,
+                requireInteraction: true,
+                data: { alertId: alert.id }
+            });
+            
+            notification.onclick = function() {
+                console.log('Notification clicked, focusing window and showing alerts tab');
+                window.focus();
+                showTab('alerts');
+                notification.close();
+            };
+            
+            notification.onshow = function() {
+                console.log('Notification shown successfully');
+            };
+            
+            notification.onerror = function(error) {
+                console.error('Notification error:', error);
+            };
+        }
     </script>
 </body>
 </html>

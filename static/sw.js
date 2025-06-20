@@ -138,8 +138,8 @@ self.addEventListener('push', (event) => {
         const data = event.data.json();
         const options = {
             body: data.body || 'New fire alert notification',
-            icon: '/icon-192.png',
-            badge: '/icon-192.png',
+            icon: '/static/icons/icon-192.png',
+            badge: '/static/icons/icon-192.png',
             vibrate: [200, 100, 200],
             requireInteraction: true,
             tag: 'fire-alert',
@@ -148,12 +148,12 @@ self.addEventListener('push', (event) => {
                 {
                     action: 'view',
                     title: 'View Alert',
-                    icon: '/icon-192.png'
+                    icon: '/static/icons/icon-192.png'
                 },
                 {
                     action: 'dismiss',
                     title: 'Dismiss',
-                    icon: '/icon-192.png'
+                    icon: '/static/icons/icon-192.png'
                 }
             ]
         };
@@ -186,6 +186,28 @@ self.addEventListener('notificationclick', (event) => {
         event.waitUntil(
             clients.openWindow('/')
         );
+    }
+});
+
+// Handle messages from the main app (for badge updates)
+self.addEventListener('message', (event) => {
+    console.log('Service Worker received message:', event.data);
+    
+    if (event.data && event.data.type === 'UPDATE_BADGE') {
+        const count = event.data.count || 0;
+        
+        // Update app badge if supported
+        if ('setAppBadge' in navigator) {
+            navigator.setAppBadge(count).catch(error => {
+                console.log('Failed to set app badge:', error);
+            });
+        }
+        
+        // Update notification badge
+        if (count > 0) {
+            // Set badge on the app icon
+            self.registration.update();
+        }
     }
 });
 

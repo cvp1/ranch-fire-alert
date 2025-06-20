@@ -150,6 +150,30 @@ def firebase_sw():
     from flask import send_from_directory
     return send_from_directory('static', 'firebase-messaging-sw.js', mimetype='application/javascript')
 
+@app.route('/favicon.ico')
+def favicon():
+    """Serve the favicon"""
+    from flask import send_from_directory
+    return send_from_directory('static/icons', 'icon-192.png', mimetype='image/png')
+
+@app.route('/apple-touch-icon.png')
+def apple_touch_icon():
+    """Serve Apple touch icon"""
+    from flask import send_from_directory
+    return send_from_directory('static/icons', 'icon-192.png', mimetype='image/png')
+
+@app.route('/apple-touch-icon-precomposed.png')
+def apple_touch_icon_precomposed():
+    """Serve Apple touch icon precomposed"""
+    from flask import send_from_directory
+    return send_from_directory('static/icons', 'icon-192.png', mimetype='image/png')
+
+@app.route('/static/icons/icon-72.png')
+def icon_72():
+    """Serve the 72px icon (fallback to 192px)"""
+    from flask import send_from_directory
+    return send_from_directory('static/icons', 'icon-192.png', mimetype='image/png')
+
 @app.route('/api/config', methods=['GET'])
 def get_config():
     """Return frontend configuration from environment variables"""
