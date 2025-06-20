@@ -1218,26 +1218,73 @@ def admin_list_users():
     """List all users (admin only)"""
     try:
         user_id = request.args.get('user_id')
+        if not user_id:
+            return jsonify({'success': False, 'error': 'User ID required'}), 400
+        
         user = db.session.get(User, user_id)
         if not user or not user.is_admin:
             return jsonify({'success': False, 'error': 'Admin access required'}), 403
+        
         users = User.query.order_by(User.created_at.desc()).all()
         user_list = []
+        
         for u in users:
+            ranch = db.session.get(Ranch, u.ranch_id)
             user_list.append({
                 'id': u.id,
                 'name': u.name,
                 'email': u.email,
                 'phone': u.phone,
                 'ranch_id': u.ranch_id,
+                'ranch_name': ranch.name if ranch else 'Unknown Ranch',
                 'is_admin': u.is_admin,
                 'last_login': u.last_login.isoformat() if u.last_login else None,
                 'created_at': u.created_at.isoformat() if u.created_at else None
             })
+        
+        logger.info(f"Admin {user.name} listed {len(user_list)} users")
         return jsonify({'success': True, 'users': user_list})
+        
     except Exception as e:
         logger.error(f"List users error: {e}")
         return jsonify({'success': False, 'error': f'Failed to list users: {str(e)}'}), 500
+
+@app.route('/api/admin/users/<int:target_user_id>', methods=['GET'])
+def admin_get_user(target_user_id):
+    """Get a single user by ID (admin only)"""
+    try:
+        user_id = request.args.get('user_id')
+        if not user_id:
+            return jsonify({'success': False, 'error': 'User ID required'}), 400
+        
+        admin_user = db.session.get(User, user_id)
+        if not admin_user or not admin_user.is_admin:
+            return jsonify({'success': False, 'error': 'Admin access required'}), 403
+        
+        user = db.session.get(User, target_user_id)
+        if not user:
+            return jsonify({'success': False, 'error': 'User not found'}), 404
+        
+        ranch = db.session.get(Ranch, user.ranch_id)
+        
+        return jsonify({
+            'success': True,
+            'user': {
+                'id': user.id,
+                'name': user.name,
+                'email': user.email,
+                'phone': user.phone,
+                'ranch_id': user.ranch_id,
+                'ranch_name': ranch.name if ranch else 'Unknown Ranch',
+                'is_admin': user.is_admin,
+                'last_login': user.last_login.isoformat() if user.last_login else None,
+                'created_at': user.created_at.isoformat() if user.created_at else None
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Get user error: {e}")
+        return jsonify({'success': False, 'error': f'Failed to get user: {str(e)}'}), 500
 
 @app.route('/api/admin/users', methods=['POST'])
 def admin_add_user():
@@ -1247,23 +1294,78 @@ def admin_add_user():
         admin_user = db.session.get(User, user_id)
         if not admin_user or not admin_user.is_admin:
             return jsonify({'success': False, 'error': 'Admin access required'}), 403
+        
         data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+        
+        # Debug logging - show raw data
+        logger.info(f"Raw request data: {data}")
+        logger.info(f"Data type: {type(data)}")
+        logger.info(f"Data keys: {list(data.keys()) if isinstance(data, dict) else 'Not a dict'}")
+        
         name = data.get('name', '').strip()
-        email = data.get('email', '').strip() or None
-        phone = data.get('phone', '').strip() or None
-        password = data.get('password', '').strip() or None
+        email = data.get('email', '').strip() if data.get('email') else None
+        phone = data.get('phone', '').strip() if data.get('phone') else None
+        password = data.get('password', '').strip() if data.get('password') else None
         ranch_id = data.get('ranch_id')
         is_admin = bool(data.get('is_admin', False))
-        if not name or (not email and not phone) or not ranch_id:
-            return jsonify({'success': False, 'error': 'Name, ranch, and email or phone required'}), 400
+        
+        # Debug logging - show extracted values
+        logger.info(f"Extracted values:")
+        logger.info(f"  name: '{name}' (type: {type(name)}, empty: {not name})")
+        logger.info(f"  email: '{email}' (type: {type(email)})")
+        logger.info(f"  phone: '{phone}' (type: {type(phone)})")
+        logger.info(f"  ranch_id: {ranch_id} (type: {type(ranch_id)})")
+        logger.info(f"  is_admin: {is_admin}")
+        
+        # Convert ranch_id to int if it's a string
+        if ranch_id and isinstance(ranch_id, str):
+            try:
+                ranch_id = int(ranch_id)
+                logger.info(f"Converted ranch_id from string to int: {ranch_id}")
+            except ValueError:
+                logger.error(f"Failed to convert ranch_id '{ranch_id}' to int")
+                return jsonify({'success': False, 'error': 'Invalid ranch ID format'}), 400
+        
+        # Debug logging - show final values
+        logger.info(f"Final processed values:")
+        logger.info(f"  name: '{name}' (empty: {not name})")
+        logger.info(f"  email: '{email}'")
+        logger.info(f"  phone: '{phone}'")
+        logger.info(f"  ranch_id: {ranch_id} (type: {type(ranch_id)})")
+        
+        # Validation with detailed logging
+        if not name:
+            logger.error("Validation failed: name is empty")
+            return jsonify({'success': False, 'error': 'Name is required'}), 400
+        else:
+            logger.info("Name validation passed")
+        
+        if not email and not phone:
+            logger.error("Validation failed: neither email nor phone provided")
+            return jsonify({'success': False, 'error': 'Email or phone number is required'}), 400
+        else:
+            logger.info("Email/phone validation passed")
+        
+        if not ranch_id or ranch_id == 0:
+            logger.error(f"Validation failed: ranch_id is {ranch_id}")
+            return jsonify({'success': False, 'error': 'Ranch selection is required'}), 400
+        else:
+            logger.info("Ranch validation passed")
+        
         # Check for existing user
         if email and User.query.filter_by(email=email.lower()).first():
             return jsonify({'success': False, 'error': 'Email already in use'}), 400
         if phone and User.query.filter_by(phone=phone).first():
             return jsonify({'success': False, 'error': 'Phone already in use'}), 400
+        
+        # Verify ranch exists
         ranch = db.session.get(Ranch, ranch_id)
         if not ranch:
-            return jsonify({'success': False, 'error': 'Invalid ranch'}), 400
+            return jsonify({'success': False, 'error': 'Invalid ranch selection'}), 400
+        
+        # Create new user
         user = User(
             name=name,
             email=email.lower() if email else None,
@@ -1272,17 +1374,25 @@ def admin_add_user():
             ranch_id=ranch_id,
             is_admin=is_admin
         )
+        
         db.session.add(user)
         db.session.commit()
-        return jsonify({'success': True, 'user': {
-            'id': user.id,
-            'name': user.name,
-            'email': user.email,
-            'phone': user.phone,
-            'ranch_id': user.ranch_id,
-            'is_admin': user.is_admin,
-            'created_at': user.created_at.isoformat() if user.created_at else None
-        }})
+        
+        logger.info(f"Admin created new user: {user.name} (ID: {user.id})")
+        return jsonify({
+            'success': True, 
+            'user': {
+                'id': user.id,
+                'name': user.name,
+                'email': user.email,
+                'phone': user.phone,
+                'ranch_id': user.ranch_id,
+                'ranch_name': ranch.name,
+                'is_admin': user.is_admin,
+                'created_at': user.created_at.isoformat() if user.created_at else None
+            }
+        })
+        
     except Exception as e:
         logger.error(f"Add user error: {e}")
         db.session.rollback()
@@ -1296,44 +1406,92 @@ def admin_edit_user(edit_user_id):
         admin_user = db.session.get(User, user_id)
         if not admin_user or not admin_user.is_admin:
             return jsonify({'success': False, 'error': 'Admin access required'}), 403
+        
         data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'}), 400
+        
         user = db.session.get(User, edit_user_id)
         if not user:
             return jsonify({'success': False, 'error': 'User not found'}), 404
-        name = data.get('name', '').strip()
-        email = data.get('email', '').strip() or None
-        phone = data.get('phone', '').strip() or None
-        password = data.get('password', '').strip() or None
-        ranch_id = data.get('ranch_id')
-        is_admin = bool(data.get('is_admin', user.is_admin))
-        if name:
+        
+        # Update fields if provided
+        if 'name' in data:
+            name = data['name'].strip()
+            if not name:
+                return jsonify({'success': False, 'error': 'Name cannot be empty'}), 400
             user.name = name
-        if email:
-            if email.lower() != user.email and User.query.filter_by(email=email.lower()).first():
-                return jsonify({'success': False, 'error': 'Email already in use'}), 400
-            user.email = email.lower()
-        if phone:
-            if phone != user.phone and User.query.filter_by(phone=phone).first():
-                return jsonify({'success': False, 'error': 'Phone already in use'}), 400
-            user.phone = phone
-        if password:
-            user.password_hash = simple_hash(password)
-        if ranch_id:
-            ranch = db.session.get(Ranch, ranch_id)
-            if not ranch:
-                return jsonify({'success': False, 'error': 'Invalid ranch'}), 400
-            user.ranch_id = ranch_id
-        user.is_admin = is_admin
+        
+        if 'email' in data:
+            email = data['email'].strip() if data['email'] else None
+            if email and email.lower() != user.email:
+                if User.query.filter_by(email=email.lower()).first():
+                    return jsonify({'success': False, 'error': 'Email already in use'}), 400
+                user.email = email.lower()
+            elif not email:
+                user.email = None
+        
+        if 'phone' in data:
+            phone = data['phone'].strip() if data['phone'] else None
+            if phone and phone != user.phone:
+                if User.query.filter_by(phone=phone).first():
+                    return jsonify({'success': False, 'error': 'Phone already in use'}), 400
+                user.phone = phone
+            elif not phone:
+                user.phone = None
+        
+        if 'password' in data:
+            password = data['password'].strip() if data['password'] else None
+            if password:
+                user.password_hash = simple_hash(password)
+            else:
+                user.password_hash = None
+        
+        if 'ranch_id' in data:
+            ranch_id = data['ranch_id']
+            
+            # Convert ranch_id to int if it's a string
+            if ranch_id and isinstance(ranch_id, str):
+                try:
+                    ranch_id = int(ranch_id)
+                except ValueError:
+                    return jsonify({'success': False, 'error': 'Invalid ranch ID format'}), 400
+            
+            if ranch_id and ranch_id != 0:
+                ranch = db.session.get(Ranch, ranch_id)
+                if not ranch:
+                    return jsonify({'success': False, 'error': 'Invalid ranch selection'}), 400
+                user.ranch_id = ranch_id
+            else:
+                return jsonify({'success': False, 'error': 'Ranch selection is required'}), 400
+        
+        if 'is_admin' in data:
+            user.is_admin = bool(data['is_admin'])
+        
+        # Ensure user has at least email or phone
+        if not user.email and not user.phone:
+            return jsonify({'success': False, 'error': 'User must have either email or phone number'}), 400
+        
         db.session.commit()
-        return jsonify({'success': True, 'user': {
-            'id': user.id,
-            'name': user.name,
-            'email': user.email,
-            'phone': user.phone,
-            'ranch_id': user.ranch_id,
-            'is_admin': user.is_admin,
-            'created_at': user.created_at.isoformat() if user.created_at else None
-        }})
+        
+        # Get ranch info for response
+        ranch = db.session.get(Ranch, user.ranch_id)
+        
+        logger.info(f"Admin updated user: {user.name} (ID: {user.id})")
+        return jsonify({
+            'success': True, 
+            'user': {
+                'id': user.id,
+                'name': user.name,
+                'email': user.email,
+                'phone': user.phone,
+                'ranch_id': user.ranch_id,
+                'ranch_name': ranch.name if ranch else 'Unknown Ranch',
+                'is_admin': user.is_admin,
+                'created_at': user.created_at.isoformat() if user.created_at else None
+            }
+        })
+        
     except Exception as e:
         logger.error(f"Edit user error: {e}")
         db.session.rollback()
