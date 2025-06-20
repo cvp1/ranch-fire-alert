@@ -688,18 +688,6 @@
             <button class="btn btn-success" onclick="installPWA()">Install App</button>
         </div>
 
-        <!-- Connection Status -->
-        <div class="card">
-            <p>
-                <span id="connectionStatus" class="status-indicator status-offline"></span>
-                <span id="connectionText">Checking connection...</span>
-            </p>
-            <p style="margin-top: 8px; font-size: 12px; color: #6b7280;">
-                <span id="appVersion">App v1.0.0</span>
-                <span id="swVersion" style="margin-left: 12px;">SW v1.0.1</span>
-            </p>
-        </div>
-
         <!-- User Check Form -->
         <div id="userCheckForm" class="card">
             <h2>Get Started</h2>
@@ -774,14 +762,6 @@
 
         <!-- Main Application -->
         <div id="mainApp" class="hidden">
-            <!-- User Info -->
-            <div class="card">
-                <div class="user-info">
-                    <h3 id="userName"></h3>
-                    <p id="userDetails"></p>
-                </div>
-            </div>
-
             <!-- Tab Navigation -->
             <div class="tabs">
                 <button class="tab active" onclick="showTab('alerts')">🔥 Alerts</button>
@@ -941,6 +921,24 @@
             <div class="logout-section">
                 <button class="btn btn-secondary" onclick="logout()">Sign Out</button>
             </div>
+
+            <!-- Connection Status -->
+            <div class="card">
+                <p>
+                    <span id="connectionStatus" class="status-indicator status-offline"></span>
+                    <span id="connectionText">Checking connection...</span>
+                </p>
+                <div id="userInfo" style="margin-top: 8px; display: none;">
+                    <p style="margin: 0; font-size: 13px; color: #64748b; font-weight: 500;">
+                        <span id="userName"></span>
+                        <span id="userDetails" style="margin-left: 8px; font-weight: 400;"></span>
+                    </p>
+                </div>
+                <p style="margin-top: 8px; font-size: 12px; color: #6b7280;">
+                    <span id="appVersion">App v1.0.0</span>
+                    <span id="swVersion" style="margin-left: 12px;">SW v1.0.1</span>
+                </p>
+            </div>
         </div>
     </div>
 
@@ -976,7 +974,6 @@
         </div>
     </div>
 
-    <!-- Firebase SDK v9 (modular) -->
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js';
         import { getMessaging, getToken, onMessage } from 'https://www.gstatic.com/firebasejs/9.22.2/firebase-messaging.js';
@@ -1063,7 +1060,11 @@
             // Periodic PWA installation check (in case beforeinstallprompt was missed)
             setInterval(() => {
                 if (!deferredPrompt && !window.matchMedia('(display-mode: standalone)').matches) {
-                    checkPWACriteria();
+                    // Check if user has already dismissed the install prompt for this session
+                    const hasDismissedInstall = localStorage.getItem('pwaInstallDismissed');
+                    if (!hasDismissedInstall) {
+                        checkPWACriteria();
+                    }
                 }
             }, 30000); // Check every 30 seconds
             
@@ -1344,6 +1345,13 @@
                 return;
             }
             
+            // Check if user has already dismissed the install prompt for this session
+            const hasDismissedInstall = localStorage.getItem('pwaInstallDismissed');
+            if (hasDismissedInstall) {
+                console.log('User has already dismissed PWA install prompt for this session');
+                return;
+            }
+            
             // Listen for beforeinstallprompt event
             window.addEventListener('beforeinstallprompt', (e) => {
                 console.log('beforeinstallprompt event fired');
@@ -1388,6 +1396,9 @@
             if (installPrompt) {
                 installPrompt.classList.add('hidden');
                 console.log('Install prompt hidden');
+                
+                // Remember that user dismissed the install prompt for this session
+                localStorage.setItem('pwaInstallDismissed', 'true');
             }
         }
         
@@ -1434,6 +1445,13 @@
             
             // If all criteria are met but no prompt, try to show manual install option
             if (Object.values(criteria).every(Boolean)) {
+                // Check if user has already dismissed the install prompt for this session
+                const hasDismissedInstall = localStorage.getItem('pwaInstallDismissed');
+                if (hasDismissedInstall) {
+                    console.log('User has already dismissed PWA install prompt for this session');
+                    return;
+                }
+                
                 console.log('All PWA criteria met - showing manual install option');
                 showManualInstallOption();
             } else {
@@ -1856,6 +1874,12 @@
             // Update user info
             document.getElementById('userName').textContent = currentUser.name;
             document.getElementById('userDetails').textContent = `${currentUser.email || currentUser.phone} • ${currentUser.ranch_name || 'Unknown Ranch'}`;
+            
+            // Show user info in connection status pane
+            const userInfoDiv = document.getElementById('userInfo');
+            if (userInfoDiv) {
+                userInfoDiv.style.display = 'block';
+            }
             
             // Show admin tabs if user is admin
             if (currentUser.is_admin) {
@@ -2589,6 +2613,16 @@
             currentUser = null;
             // Clear session from localStorage
             localStorage.removeItem('ranchFireAlertUser');
+            
+            // Clear PWA install dismissed preference so user sees prompt again on next login
+            localStorage.removeItem('pwaInstallDismissed');
+            
+            // Hide user info in connection status pane
+            const userInfoDiv = document.getElementById('userInfo');
+            if (userInfoDiv) {
+                userInfoDiv.style.display = 'none';
+            }
+            
             showSuccess('Logged out successfully');
             setTimeout(() => {
                 showUserCheck();
