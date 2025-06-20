@@ -43,6 +43,7 @@
             margin: 0 auto;
             padding: 24px 20px;
             min-height: 100vh;
+            box-sizing: border-box;
         }
         
         .header {
@@ -648,18 +649,54 @@
         @media (max-width: 480px) {
             .container {
                 padding: 16px 12px;
+                max-width: 100%;
             }
             
-            .card {
-                padding: 20px 16px;
+            .header {
+                margin-bottom: 24px;
+                padding: 16px 0;
             }
             
             .header h1 {
                 font-size: 24px;
             }
             
+            .header p {
+                font-size: 14px;
+            }
+            
+            .card {
+                padding: 20px 16px;
+                margin-bottom: 16px;
+                border-radius: 12px;
+            }
+            
             .btn {
                 padding: 12px 20px;
+                font-size: 15px;
+            }
+            
+            .form-group input,
+            .form-group select,
+            .form-group textarea {
+                padding: 12px 14px;
+                font-size: 16px; /* Prevents zoom on iOS */
+            }
+        }
+        
+        /* Tablet optimization */
+        @media (min-width: 481px) and (max-width: 768px) {
+            .container {
+                max-width: 600px;
+                padding: 20px 24px;
+            }
+        }
+        
+        /* Ensure proper viewport on mobile */
+        @media (max-width: 480px) {
+            body {
+                -webkit-text-size-adjust: 100%;
+                -ms-text-size-adjust: 100%;
             }
         }
     </style>
@@ -936,7 +973,8 @@
                 </div>
                 <p style="margin-top: 8px; font-size: 12px; color: #6b7280;">
                     <span id="appVersion">App v1.0.0</span>
-                    <span id="swVersion" style="margin-left: 12px;">SW v1.0.1</span>
+                    <span id="swVersion" style="margin-left: 12px;">SW v1.0.2</span>
+                    <span id="updateIndicator" style="margin-left: 12px; display: none; color: #3b82f6; font-weight: 600; cursor: pointer;" onclick="manualRefresh()" title="Click to refresh app">🔄 Update Available</span>
                 </p>
             </div>
         </div>
@@ -1057,6 +1095,15 @@
             // Set up periodic alert checking
             setInterval(checkForNewAlerts, 30000); // Check every 30 seconds
             
+            // Periodic service worker update check (more frequent for mobile)
+            setInterval(() => {
+                if (swRegistration) {
+                    swRegistration.update().catch(error => {
+                        console.log('Service Worker update check failed:', error);
+                    });
+                }
+            }, 1000 * 60 * 5); // Check every 5 minutes
+            
             // Periodic PWA installation check (in case beforeinstallprompt was missed)
             setInterval(() => {
                 if (!deferredPrompt && !window.matchMedia('(display-mode: standalone)').matches) {
@@ -1073,6 +1120,16 @@
                 console.log('Performing initial PWA criteria check...');
                 checkPWACriteria();
             }, 2000);
+            
+            // Force update check on page visibility change (when user returns to app)
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden && swRegistration) {
+                    console.log('Page became visible, checking for updates...');
+                    swRegistration.update().catch(error => {
+                        console.log('Service Worker update check failed:', error);
+                    });
+                }
+            });
         });
 
         // Load configuration from backend
@@ -1159,6 +1216,18 @@
         
         // Show update notification to user
         function showUpdateNotification() {
+            // Remove any existing notification
+            const existingNotification = document.getElementById('updateNotification');
+            if (existingNotification) {
+                existingNotification.remove();
+            }
+            
+            // Show update indicator in connection status pane
+            const updateIndicator = document.getElementById('updateIndicator');
+            if (updateIndicator) {
+                updateIndicator.style.display = 'inline';
+            }
+            
             // Create update notification element
             const updateNotification = document.createElement('div');
             updateNotification.id = 'updateNotification';
@@ -1166,49 +1235,104 @@
             updateNotification.style.cssText = `
                 position: fixed;
                 top: 20px;
-                right: 20px;
+                left: 50%;
+                transform: translateX(-50%);
                 z-index: 10000;
-                max-width: 300px;
+                max-width: 90%;
+                width: 400px;
                 background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
                 color: white;
                 box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.4);
                 animation: slideIn 0.3s ease-out;
+                border: none;
             `;
             
             updateNotification.innerHTML = `
-                <div style="display: flex; align-items: center; justify-content: space-between;">
-                    <div>
-                        <h4 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">🔄 Update Available</h4>
-                        <p style="margin: 0; font-size: 14px; opacity: 0.9;">A new version is ready to install</p>
+                <div style="text-align: center;">
+                    <h4 style="margin: 0 0 12px 0; font-size: 18px; font-weight: 600;">🔄 App Update Available</h4>
+                    <p style="margin: 0 0 16px 0; font-size: 14px; opacity: 0.9;">A new version with improved layout is ready to install</p>
+                    <div style="display: flex; gap: 12px; justify-content: center;">
+                        <button id="updateNowBtn" style="
+                            background: rgba(255,255,255,0.2);
+                            border: 1px solid rgba(255,255,255,0.3);
+                            color: white;
+                            padding: 10px 20px;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            font-weight: 600;
+                            font-size: 14px;
+                            transition: all 0.2s ease;
+                            flex: 1;
+                            max-width: 120px;
+                        " onmouseover="this.style.background='rgba(255,255,255,0.3)'" 
+                           onmouseout="this.style.background='rgba(255,255,255,0.2)'">
+                            Update Now
+                        </button>
+                        <button id="refreshBtn" style="
+                            background: rgba(255,255,255,0.1);
+                            border: 1px solid rgba(255,255,255,0.2);
+                            color: white;
+                            padding: 10px 20px;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            font-weight: 600;
+                            font-size: 14px;
+                            transition: all 0.2s ease;
+                            flex: 1;
+                            max-width: 120px;
+                        " onmouseover="this.style.background='rgba(255,255,255,0.2)'" 
+                           onmouseout="this.style.background='rgba(255,255,255,0.1)'">
+                            Refresh
+                        </button>
                     </div>
-                    <button onclick="applyUpdate()" style="
-                        background: rgba(255,255,255,0.2);
-                        border: 1px solid rgba(255,255,255,0.3);
-                        color: white;
-                        padding: 8px 16px;
-                        border-radius: 8px;
-                        cursor: pointer;
-                        font-weight: 600;
-                        font-size: 14px;
-                        transition: all 0.2s ease;
-                    " onmouseover="this.style.background='rgba(255,255,255,0.3)'" 
-                       onmouseout="this.style.background='rgba(255,255,255,0.2)'">
-                        Update Now
-                    </button>
                 </div>
             `;
+            
+            // Add event listeners to buttons
+            setTimeout(() => {
+                const updateNowBtn = document.getElementById('updateNowBtn');
+                const refreshBtn = document.getElementById('refreshBtn');
+                
+                if (updateNowBtn) {
+                    updateNowBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        console.log('Update Now button clicked');
+                        applyUpdate();
+                    });
+                }
+                
+                if (refreshBtn) {
+                    refreshBtn.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        console.log('Refresh button clicked');
+                        manualRefresh();
+                    });
+                }
+            }, 100);
             
             // Add CSS animation
             const style = document.createElement('style');
             style.textContent = `
                 @keyframes slideIn {
                     from {
-                        transform: translateX(100%);
+                        transform: translateX(-50%) translateY(-100%);
                         opacity: 0;
                     }
                     to {
-                        transform: translateX(0);
+                        transform: translateX(-50%) translateY(0);
                         opacity: 1;
+                    }
+                }
+                @keyframes slideOut {
+                    from {
+                        transform: translateX(-50%) translateY(0);
+                        opacity: 1;
+                    }
+                    to {
+                        transform: translateX(-50%) translateY(-100%);
+                        opacity: 0;
                     }
                 }
             `;
@@ -1217,7 +1341,7 @@
             // Add to page
             document.body.appendChild(updateNotification);
             
-            // Auto-hide after 30 seconds
+            // Auto-hide after 60 seconds (longer for mobile)
             setTimeout(() => {
                 if (updateNotification.parentNode) {
                     updateNotification.style.animation = 'slideOut 0.3s ease-in';
@@ -1227,12 +1351,66 @@
                         }
                     }, 300);
                 }
-            }, 30000);
+            }, 60000);
         }
+        
+        // Manual refresh function
+        function manualRefresh() {
+            console.log('Manual refresh triggered');
+            console.log('Current URL:', window.location.href);
+            console.log('Service Worker registration:', swRegistration ? 'available' : 'not available');
+            
+            try {
+                // Show a brief loading message
+                const updateIndicator = document.getElementById('updateIndicator');
+                if (updateIndicator) {
+                    updateIndicator.textContent = '🔄 Refreshing...';
+                    updateIndicator.style.color = '#10b981';
+                }
+                
+                // Try to clear any caches first
+                if ('caches' in window) {
+                    caches.keys().then(cacheNames => {
+                        console.log('Found caches:', cacheNames);
+                        return Promise.all(
+                            cacheNames.map(cacheName => {
+                                console.log('Deleting cache:', cacheName);
+                                return caches.delete(cacheName);
+                            })
+                        );
+                    }).then(() => {
+                        console.log('Caches cleared, reloading page...');
+                        // Small delay to show the "Refreshing..." message
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 500);
+                    }).catch(error => {
+                        console.error('Error clearing caches:', error);
+                        window.location.reload();
+                    });
+                } else {
+                    console.log('Cache API not available, reloading directly...');
+                    window.location.reload();
+                }
+            } catch (error) {
+                console.error('Error in manual refresh:', error);
+                // Fallback to simple reload
+                window.location.reload();
+            }
+        }
+        
+        // Make manualRefresh globally accessible
+        window.manualRefresh = manualRefresh;
         
         // Apply service worker update
         function applyUpdate() {
             if (swRegistration && swRegistration.waiting) {
+                // Hide update indicator
+                const updateIndicator = document.getElementById('updateIndicator');
+                if (updateIndicator) {
+                    updateIndicator.style.display = 'none';
+                }
+                
                 // Send message to service worker to skip waiting
                 swRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
                 
@@ -1268,6 +1446,19 @@
                 };
                 
                 swRegistration.active.postMessage({ type: 'GET_VERSION' }, [channel.port2]);
+            }
+            
+            // Check for waiting service worker
+            checkForWaitingServiceWorker();
+        }
+        
+        // Check for waiting service worker and show indicator
+        function checkForWaitingServiceWorker() {
+            if (swRegistration && swRegistration.waiting) {
+                const updateIndicator = document.getElementById('updateIndicator');
+                if (updateIndicator) {
+                    updateIndicator.style.display = 'inline';
+                }
             }
         }
 

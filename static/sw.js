@@ -1,5 +1,5 @@
 // sw.js - Service Worker for Ranch Fire Alert PWA
-const CACHE_VERSION = '1.0.1';
+const CACHE_VERSION = '1.0.2';
 const CACHE_NAME = `ranch-fire-alert-v${CACHE_VERSION}`;
 const STATIC_CACHE = `ranch-fire-alert-static-v${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `ranch-fire-alert-dynamic-v${CACHE_VERSION}`;
