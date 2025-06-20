@@ -1,11 +1,11 @@
 {
-  "name": "Ranch Fire Alert System",
+  "name": "DMR Fire Alert System",
   "short_name": "Fire Alert",
   "description": "Emergency fire notification system for ranch communities with livestock coordination",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#1e3c72",
-  "theme_color": "#d32f2f",
+  "background_color": "#f8fafc",
+  "theme_color": "#3b82f6",
   "orientation": "portrait",
   "scope": "/",
   "lang": "en-US",
@@ -23,7 +23,7 @@
       "purpose": "any maskable"
     }
   ],
-  "categories": ["productivity", "utilities", "business"],
+  "categories": ["productivity", "utilities", "business", "weather"],
   "shortcuts": [
     {
       "name": "Send Fire Alert",
@@ -49,5 +49,10 @@
         }
       ]
     }
-  ]
+  ],
+  "prefer_related_applications": false,
+  "related_applications": [],
+  "edge_side_panel": {
+    "preferred_width": 400
+  }
 }

@@ -7,17 +7,18 @@
     
     <!-- PWA Meta Tags -->
     <link rel="manifest" href="/static/manifest.json">
-    <meta name="theme-color" content="#CD853F">
-    <link rel="icon" href="/static/icons/icon-192.png">
-    <link rel="shortcut icon" href="/favicon.ico">
+    <meta name="theme-color" content="#3b82f6">
+    <link rel="icon" type="image/png" sizes="192x192" href="/static/icons/icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="/static/icons/icon-512.png">
+    <link rel="shortcut icon" href="/static/icons/icon-192.png">
     <meta name="mobile-web-app-capable" content="yes">
     
     <!-- iOS Specific Meta Tags -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Fire Alert">
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-    <link rel="apple-touch-icon-precomposed" href="/apple-touch-icon-precomposed.png">
+    <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+    <link rel="apple-touch-icon-precomposed" href="/static/icons/icon-192.png">
     <link rel="apple-touch-startup-image" href="/static/icons/icon-512.png">
     
     <meta name="description" content="Emergency fire notification system for ranch communities">
@@ -30,178 +31,234 @@
         }
         
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #FAF3E3, #F5DEB3);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
             min-height: 100vh;
-            color: #333;
+            color: #1e293b;
+            line-height: 1.6;
         }
         
         .container {
-            max-width: 400px;
+            max-width: 480px;
             margin: 0 auto;
-            padding: 20px;
+            padding: 24px 20px;
             min-height: 100vh;
         }
         
         .header {
             text-align: center;
-            color: white;
-            margin-bottom: 30px;
-        }
-        
-        .header h1, .header p {
-            color: #6B4423;
-            text-shadow: 0 2px 8px rgba(250, 243, 227, 0.25);
+            margin-bottom: 32px;
+            padding: 24px 0;
         }
         
         .header h1 {
-            font-size: 24px;
-            margin-bottom: 10px;
+            font-size: 28px;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 8px;
+            letter-spacing: -0.025em;
         }
         
         .header p {
-            opacity: 0.9;
-            font-size: 14px;
+            color: #64748b;
+            font-size: 16px;
+            font-weight: 500;
         }
         
         .card {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 24px;
             margin-bottom: 20px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border: 1px solid #e2e8f0;
+            transition: all 0.2s ease-in-out;
+        }
+        
+        .card:hover {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            transform: translateY(-1px);
         }
         
         .alert-card {
-            border-left: 5px solid #d32f2f;
+            border-left: 4px solid #ef4444;
+            background: linear-gradient(135deg, #fef2f2 0%, #ffffff 100%);
         }
         
         .alert-card.critical {
-            border-left-color: #8B0000;
-            background: #fff5f5;
+            border-left-color: #dc2626;
+            background: linear-gradient(135deg, #fef2f2 0%, #ffffff 100%);
         }
         
         .alert-card.high {
-            border-left-color: #FF0000;
-            background: #fff8f8;
+            border-left-color: #ef4444;
+            background: linear-gradient(135deg, #fff7ed 0%, #ffffff 100%);
         }
         
         .alert-card.medium {
-            border-left-color: #FF4500;
+            border-left-color: #f97316;
+            background: linear-gradient(135deg, #fffbeb 0%, #ffffff 100%);
         }
         
         .alert-card.low {
-            border-left-color: #FFA500;
+            border-left-color: #f59e0b;
+            background: linear-gradient(135deg, #fefce8 0%, #ffffff 100%);
         }
         
         .severity-badge {
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 4px;
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 12px;
+            border-radius: 20px;
             font-size: 12px;
-            font-weight: bold;
+            font-weight: 600;
             text-transform: uppercase;
-            margin-bottom: 10px;
+            letter-spacing: 0.05em;
+            margin-bottom: 12px;
         }
         
         .severity-critical {
-            background: #8B0000;
+            background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
             color: white;
         }
         
         .severity-high {
-            background: #FF0000;
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
             color: white;
         }
         
         .severity-medium {
-            background: #FF4500;
+            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
             color: white;
         }
         
         .severity-low {
-            background: #FFA500;
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
             color: white;
         }
         
         .btn {
-            background: #CD853F;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
             color: white;
             border: none;
-            padding: 12px 20px;
-            border-radius: 8px;
+            padding: 14px 24px;
+            border-radius: 12px;
             font-size: 16px;
+            font-weight: 600;
             cursor: pointer;
             width: 100%;
-            margin-bottom: 10px;
-            font-weight: 500;
-            transition: background 0.3s ease;
+            margin-bottom: 12px;
+            transition: all 0.2s ease-in-out;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .btn:hover::before {
+            left: 100%;
         }
         
         .btn:hover {
-            background: #A0522D;
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.4);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
         }
         
         .btn:disabled {
-            background: #ccc;
+            background: #94a3b8;
             cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .btn:disabled::before {
+            display: none;
         }
         
         .btn-secondary {
-            background: #8B7355;
+            background: linear-gradient(135deg, #64748b 0%, #475569 100%);
         }
         
         .btn-secondary:hover {
-            background: #6B4423;
+            background: linear-gradient(135deg, #475569 0%, #334155 100%);
+            box-shadow: 0 10px 25px -5px rgba(100, 116, 139, 0.4);
         }
         
         .btn-success {
-            background: #CD853F;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
         }
         
         .btn-success:hover {
-            background: #B8860B;
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.4);
         }
         
         .btn-danger {
-            background: #B22222;
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
         }
         
         .btn-danger:hover {
-            background: #8B0000;
+            background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+            box-shadow: 0 10px 25px -5px rgba(239, 68, 68, 0.4);
         }
         
         .form-group {
-            margin-bottom: 15px;
+            margin-bottom: 20px;
         }
         
         .form-group label {
             display: block;
-            margin-bottom: 5px;
-            font-weight: 500;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #374151;
+            font-size: 14px;
         }
         
         .form-group input,
         .form-group select,
         .form-group textarea {
             width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
+            padding: 14px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
             font-size: 16px;
+            background: #ffffff;
+            transition: all 0.2s ease-in-out;
+            font-family: inherit;
         }
         
         .form-group input:focus,
         .form-group select:focus,
         .form-group textarea:focus {
             outline: none;
-            border-color: #CD853F;
-            box-shadow: 0 0 0 2px rgba(205, 133, 63, 0.1);
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            background: #ffffff;
+        }
+        
+        .form-group input::placeholder,
+        .form-group textarea::placeholder {
+            color: #9ca3af;
         }
         
         .form-group textarea {
-            height: 80px;
+            height: 100px;
             resize: vertical;
+            line-height: 1.5;
         }
         
         .status-indicator {
@@ -209,23 +266,44 @@
             height: 12px;
             border-radius: 50%;
             display: inline-block;
-            margin-right: 8px;
+            margin-right: 12px;
+            position: relative;
+        }
+        
+        .status-indicator::after {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            border-radius: 50%;
+            background: inherit;
+            opacity: 0.3;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 0.3; }
+            50% { transform: scale(1.2); opacity: 0.1; }
+            100% { transform: scale(1); opacity: 0.3; }
         }
         
         .status-online {
-            background: #4caf50;
+            background: #10b981;
         }
         
         .status-offline {
-            background: #f44336;
+            background: #ef4444;
         }
         
         .livestock-request {
-            background: #fff3e0;
-            border-left: 4px solid #ff9800;
-            padding: 15px;
-            margin-bottom: 10px;
-            border-radius: 4px;
+            background: linear-gradient(135deg, #fff7ed 0%, #ffffff 100%);
+            border-left: 4px solid #f97316;
+            padding: 20px;
+            margin-bottom: 16px;
+            border-radius: 12px;
+            border: 1px solid #fed7aa;
         }
         
         .hidden {
@@ -234,84 +312,91 @@
         
         .tabs {
             display: flex;
-            background: white;
-            border-radius: 8px;
-            margin-bottom: 20px;
+            background: #ffffff;
+            border-radius: 16px;
+            margin-bottom: 24px;
             overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e2e8f0;
         }
         
         .tab {
             flex: 1;
-            background: #f5f5f5;
+            background: #f8fafc;
             border: none;
-            padding: 15px 8px;
+            padding: 16px 12px;
             text-align: center;
             cursor: pointer;
-            font-size: 13px;
-            font-weight: 500;
-            transition: all 0.3s ease;
-            border-radius: 8px 8px 0 0;
-            margin-right: 4px;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.2s ease-in-out;
             position: relative;
+            color: #64748b;
         }
         
         .tab.active {
-            background: #CD853F;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
             color: white;
         }
         
         .tab-badge {
             position: absolute;
-            top: -5px;
-            right: -5px;
-            background: #d32f2f;
+            top: -6px;
+            right: -6px;
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
             color: white;
             border-radius: 50%;
-            width: 20px;
-            height: 20px;
+            width: 22px;
+            height: 22px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 12px;
-            font-weight: bold;
-            min-width: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            min-width: 22px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
         
-        .tab:hover {
-            opacity: 0.8;
+        .tab:hover:not(.active) {
+            background: #e2e8f0;
+            color: #475569;
         }
         
         .timestamp {
             font-size: 12px;
-            color: #666;
-            margin-top: 10px;
+            color: #6b7280;
+            margin-top: 12px;
+            font-weight: 500;
         }
         
         .error-message {
-            background: #ffebee;
-            color: #c62828;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            border-left: 4px solid #c62828;
+            background: linear-gradient(135deg, #fef2f2 0%, #ffffff 100%);
+            color: #dc2626;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            border-left: 4px solid #ef4444;
+            border: 1px solid #fecaca;
         }
         
         .success-message {
-            background: #e8f5e8;
-            color: #2e7d32;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            border-left: 4px solid #4caf50;
+            background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);
+            color: #16a34a;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            border-left: 4px solid #22c55e;
+            border: 1px solid #bbf7d0;
         }
         
         .info-message {
-            background: #e3f2fd;
-            color: #1565c0;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            border-left: 4px solid #1976d2;
+            background: linear-gradient(135deg, #eff6ff 0%, #ffffff 100%);
+            color: #2563eb;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            border-left: 4px solid #3b82f6;
+            border: 1px solid #bfdbfe;
         }
         
         .text-center {
@@ -319,36 +404,41 @@
         }
         
         .text-link {
-            color: #1976d2;
+            color: #3b82f6;
             text-decoration: none;
             cursor: pointer;
+            font-weight: 600;
+            transition: color 0.2s ease-in-out;
         }
         
         .text-link:hover {
+            color: #2563eb;
             text-decoration: underline;
         }
         
         .user-info {
-            background: #f5f5f5;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
+            background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            border: 1px solid #e2e8f0;
         }
         
         .user-info h3 {
-            margin-bottom: 10px;
-            color: #333;
+            margin-bottom: 8px;
+            color: #1e293b;
+            font-weight: 700;
         }
         
         .loading {
             display: inline-block;
             width: 20px;
             height: 20px;
-            border: 2px solid #f3f3f3;
-            border-top: 2px solid #d32f2f;
+            border: 2px solid #e5e7eb;
+            border-top: 2px solid #3b82f6;
             border-radius: 50%;
             animation: spin 1s linear infinite;
-            margin-right: 10px;
+            margin-right: 12px;
         }
         
         @keyframes spin {
@@ -358,22 +448,23 @@
         
         .auth-toggle {
             text-align: center;
-            margin-top: 15px;
-            padding-top: 15px;
-            border-top: 1px solid #eee;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
         }
         
         .install-prompt {
-            background: #CD853F;
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
             color: white;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 24px;
             text-align: center;
+            box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.3);
         }
         
         .admin-alert-actions {
-            margin-top: 10px;
+            margin-top: 12px;
             display: flex;
             gap: 8px;
         }
@@ -381,14 +472,14 @@
         .admin-alert-actions .btn {
             flex: 1;
             font-size: 12px;
-            padding: 6px 12px;
+            padding: 8px 12px;
             margin: 0;
         }
         
         .admin-controls {
             display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
+            gap: 12px;
+            margin-bottom: 20px;
             align-items: center;
         }
         
@@ -399,63 +490,72 @@
         
         .admin-controls select {
             flex: 1;
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 6px;
+            padding: 10px 14px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
             font-size: 14px;
+            background: #ffffff;
         }
         
         .alert-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 10px;
+            margin-top: 16px;
             font-size: 14px;
+            background: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
         
         .alert-table th,
         .alert-table td {
-            padding: 8px;
+            padding: 12px 16px;
             text-align: left;
-            border-bottom: 1px solid #eee;
+            border-bottom: 1px solid #f1f5f9;
         }
         
         .alert-table th {
-            background: #f5f5f5;
-            font-weight: 600;
-            color: #333;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            font-weight: 700;
+            color: #374151;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
         
         .alert-table tr:hover {
-            background: #f9f9f9;
+            background: #f8fafc;
         }
         
         .alert-status {
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: bold;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
             text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
         
         .status-active {
-            background: #e3f2fd;
-            color: #1976d2;
+            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+            color: #1d4ed8;
         }
         
         .status-resolved {
-            background: #e8f5e8;
-            color: #388e3c;
+            background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+            color: #15803d;
         }
         
         .alert-actions {
             display: flex;
-            gap: 4px;
+            gap: 6px;
             flex-wrap: wrap;
         }
         
         .alert-actions .btn {
             font-size: 11px;
-            padding: 4px 8px;
+            padding: 6px 10px;
             margin: 0;
             min-width: auto;
         }
@@ -468,35 +568,100 @@
         }
         
         .logout-section {
-            background: #f5f5f5;
-            padding: 15px;
-            border-radius: 8px;
-            margin-top: 20px;
+            background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 24px;
             text-align: center;
+            border: 1px solid #e2e8f0;
         }
         
         .alert-stats {
             display: flex;
             justify-content: space-between;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
             font-size: 14px;
         }
         
         .stat-item {
             text-align: center;
+            flex: 1;
         }
         
         .stat-number {
             display: block;
-            font-size: 20px;
-            font-weight: bold;
-            color: #d32f2f;
+            font-size: 24px;
+            font-weight: 800;
+            color: #ef4444;
+            margin-bottom: 4px;
         }
         
-        .modal { position: fixed; z-index: 1000; left: 0; top: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; }
-        .modal.hidden { display: none; }
-        .modal-content { min-width: 320px; max-width: 95vw; position: relative; }
-        .close { position: absolute; right: 18px; top: 12px; font-size: 28px; color: #B22222; cursor: pointer; }
+        .modal { 
+            position: fixed; 
+            z-index: 1000; 
+            left: 0; 
+            top: 0; 
+            width: 100vw; 
+            height: 100vh; 
+            background: rgba(0, 0, 0, 0.5); 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            backdrop-filter: blur(4px);
+        }
+        
+        .modal.hidden { 
+            display: none; 
+        }
+        
+        .modal-content { 
+            min-width: 320px; 
+            max-width: 95vw; 
+            position: relative;
+            background: #ffffff;
+            border-radius: 16px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+        
+        .close { 
+            position: absolute; 
+            right: 20px; 
+            top: 16px; 
+            font-size: 28px; 
+            color: #6b7280; 
+            cursor: pointer;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.2s ease-in-out;
+        }
+        
+        .close:hover {
+            background: #f3f4f6;
+            color: #374151;
+        }
+        
+        /* Responsive improvements */
+        @media (max-width: 480px) {
+            .container {
+                padding: 16px 12px;
+            }
+            
+            .card {
+                padding: 20px 16px;
+            }
+            
+            .header h1 {
+                font-size: 24px;
+            }
+            
+            .btn {
+                padding: 12px 20px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -528,6 +693,10 @@
             <p>
                 <span id="connectionStatus" class="status-indicator status-offline"></span>
                 <span id="connectionText">Checking connection...</span>
+            </p>
+            <p style="margin-top: 8px; font-size: 12px; color: #6b7280;">
+                <span id="appVersion">App v1.0.0</span>
+                <span id="swVersion" style="margin-left: 12px;">SW v1.0.1</span>
             </p>
         </div>
 
@@ -890,6 +1059,19 @@
             
             // Set up periodic alert checking
             setInterval(checkForNewAlerts, 30000); // Check every 30 seconds
+            
+            // Periodic PWA installation check (in case beforeinstallprompt was missed)
+            setInterval(() => {
+                if (!deferredPrompt && !window.matchMedia('(display-mode: standalone)').matches) {
+                    checkPWACriteria();
+                }
+            }, 30000); // Check every 30 seconds
+            
+            // Initial PWA check after a short delay to ensure everything is loaded
+            setTimeout(() => {
+                console.log('Performing initial PWA criteria check...');
+                checkPWACriteria();
+            }, 2000);
         });
 
         // Load configuration from backend
@@ -921,6 +1103,8 @@
                         ]).then(([swReg, firebaseReg]) => {
                             swRegistration = swReg;
                             console.log('Service Workers registered successfully');
+                            setupServiceWorkerUpdates(swReg);
+                            updateVersionDisplay();
                             setupMessaging(config.vapidKey);
                         }).catch(error => {
                             console.error('Service Worker registration failed:', error);
@@ -935,6 +1119,154 @@
                 }
             } catch (error) {
                 console.error('Firebase initialization error:', error);
+            }
+        }
+
+        // Set up service worker update handling
+        function setupServiceWorkerUpdates(registration) {
+            let refreshing = false;
+            
+            // Handle service worker updates
+            registration.addEventListener('updatefound', () => {
+                console.log('Service Worker update found');
+                const newWorker = registration.installing;
+                
+                newWorker.addEventListener('statechange', () => {
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                        // New service worker is installed and ready
+                        showUpdateNotification();
+                    }
+                });
+            });
+            
+            // Handle controller change (when new service worker takes over)
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (!refreshing) {
+                    refreshing = true;
+                    console.log('New service worker activated, refreshing page...');
+                    window.location.reload();
+                }
+            });
+            
+            // Check for updates periodically
+            setInterval(() => {
+                registration.update().catch(error => {
+                    console.log('Service Worker update check failed:', error);
+                });
+            }, 1000 * 60 * 60); // Check every hour
+        }
+        
+        // Show update notification to user
+        function showUpdateNotification() {
+            // Create update notification element
+            const updateNotification = document.createElement('div');
+            updateNotification.id = 'updateNotification';
+            updateNotification.className = 'card';
+            updateNotification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                z-index: 10000;
+                max-width: 300px;
+                background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+                color: white;
+                box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.4);
+                animation: slideIn 0.3s ease-out;
+            `;
+            
+            updateNotification.innerHTML = `
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <div>
+                        <h4 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">🔄 Update Available</h4>
+                        <p style="margin: 0; font-size: 14px; opacity: 0.9;">A new version is ready to install</p>
+                    </div>
+                    <button onclick="applyUpdate()" style="
+                        background: rgba(255,255,255,0.2);
+                        border: 1px solid rgba(255,255,255,0.3);
+                        color: white;
+                        padding: 8px 16px;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        font-weight: 600;
+                        font-size: 14px;
+                        transition: all 0.2s ease;
+                    " onmouseover="this.style.background='rgba(255,255,255,0.3)'" 
+                       onmouseout="this.style.background='rgba(255,255,255,0.2)'">
+                        Update Now
+                    </button>
+                </div>
+            `;
+            
+            // Add CSS animation
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes slideIn {
+                    from {
+                        transform: translateX(100%);
+                        opacity: 0;
+                    }
+                    to {
+                        transform: translateX(0);
+                        opacity: 1;
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+            
+            // Add to page
+            document.body.appendChild(updateNotification);
+            
+            // Auto-hide after 30 seconds
+            setTimeout(() => {
+                if (updateNotification.parentNode) {
+                    updateNotification.style.animation = 'slideOut 0.3s ease-in';
+                    setTimeout(() => {
+                        if (updateNotification.parentNode) {
+                            updateNotification.remove();
+                        }
+                    }, 300);
+                }
+            }, 30000);
+        }
+        
+        // Apply service worker update
+        function applyUpdate() {
+            if (swRegistration && swRegistration.waiting) {
+                // Send message to service worker to skip waiting
+                swRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
+                
+                // Show loading state
+                const updateNotification = document.getElementById('updateNotification');
+                if (updateNotification) {
+                    updateNotification.innerHTML = `
+                        <div style="text-align: center; padding: 20px;">
+                            <div class="loading" style="margin: 0 auto 12px auto;"></div>
+                            <p style="margin: 0; font-size: 14px;">Updating...</p>
+                        </div>
+                    `;
+                }
+            }
+        }
+        
+        // Update version display
+        function updateVersionDisplay() {
+            // Update app version
+            const appVersionElement = document.getElementById('appVersion');
+            if (appVersionElement) {
+                appVersionElement.textContent = 'App v1.0.0';
+            }
+            
+            // Update service worker version
+            if (swRegistration && swRegistration.active) {
+                const channel = new MessageChannel();
+                channel.port1.onmessage = (event) => {
+                    const swVersionElement = document.getElementById('swVersion');
+                    if (swVersionElement && event.data.version) {
+                        swVersionElement.textContent = `SW v${event.data.version}`;
+                    }
+                };
+                
+                swRegistration.active.postMessage({ type: 'GET_VERSION' }, [channel.port2]);
             }
         }
 
@@ -997,40 +1329,191 @@
 
         // PWA Installation
         function setupPWA() {
+            console.log('Setting up PWA installation...');
+            
+            // Check if PWA is already installed
+            if (window.matchMedia('(display-mode: standalone)').matches || 
+                window.navigator.standalone === true) {
+                console.log('PWA is already installed');
+                return;
+            }
+            
+            // Check if browser supports PWA installation
+            if (!('serviceWorker' in navigator)) {
+                console.log('Service Worker not supported - PWA installation not available');
+                return;
+            }
+            
             // Listen for beforeinstallprompt event
             window.addEventListener('beforeinstallprompt', (e) => {
+                console.log('beforeinstallprompt event fired');
                 e.preventDefault();
                 deferredPrompt = e;
                 
                 // Show install prompt
-                const installPrompt = document.getElementById('installPrompt');
-                if (installPrompt) {
-                    installPrompt.classList.remove('hidden');
-                }
+                showInstallPrompt();
             });
             
             // Handle app installed event
             window.addEventListener('appinstalled', (e) => {
                 console.log('PWA was installed');
-                const installPrompt = document.getElementById('installPrompt');
-                if (installPrompt) {
-                    installPrompt.classList.add('hidden');
-                }
+                hideInstallPrompt();
+                deferredPrompt = null;
             });
+            
+            // Check if we missed the beforeinstallprompt event
+            // This can happen if the event fires before our listener is attached
+            setTimeout(() => {
+                if (!deferredPrompt) {
+                    console.log('No beforeinstallprompt event received - checking PWA criteria');
+                    checkPWACriteria();
+                }
+            }, 1000);
+        }
+        
+        // Show install prompt
+        function showInstallPrompt() {
+            const installPrompt = document.getElementById('installPrompt');
+            if (installPrompt) {
+                installPrompt.classList.remove('hidden');
+                console.log('Install prompt shown');
+            } else {
+                console.error('Install prompt element not found');
+            }
+        }
+        
+        // Hide install prompt
+        function hideInstallPrompt() {
+            const installPrompt = document.getElementById('installPrompt');
+            if (installPrompt) {
+                installPrompt.classList.add('hidden');
+                console.log('Install prompt hidden');
+            }
+        }
+        
+        // Check PWA installation criteria
+        function checkPWACriteria() {
+            console.log('Checking PWA installation criteria...');
+            
+            // Check for manifest
+            const manifestLink = document.querySelector('link[rel="manifest"]');
+            const hasManifest = !!manifestLink;
+            
+            // Check for service worker support
+            const hasServiceWorker = 'serviceWorker' in navigator;
+            
+            // Check for HTTPS or localhost
+            const isHTTPS = location.protocol === 'https:' || location.hostname === 'localhost';
+            
+            // Check for icons with sizes
+            const icon192 = document.querySelector('link[rel="icon"][sizes="192x192"]');
+            const icon512 = document.querySelector('link[rel="icon"][sizes="512x512"]');
+            const hasIcons = !!(icon192 || icon512);
+            
+            // Check if not already installed
+            const isNotAlreadyInstalled = !window.matchMedia('(display-mode: standalone)').matches && window.navigator.standalone !== true;
+            
+            const criteria = {
+                hasManifest,
+                hasServiceWorker,
+                isHTTPS,
+                hasIcons,
+                isNotAlreadyInstalled
+            };
+            
+            console.log('PWA Criteria:', criteria);
+            console.log('Icon details:', {
+                icon192: icon192?.href,
+                icon512: icon512?.href,
+                allIcons: Array.from(document.querySelectorAll('link[rel="icon"]')).map(icon => ({
+                    href: icon.href,
+                    sizes: icon.sizes?.value,
+                    type: icon.type
+                }))
+            });
+            
+            // If all criteria are met but no prompt, try to show manual install option
+            if (Object.values(criteria).every(Boolean)) {
+                console.log('All PWA criteria met - showing manual install option');
+                showManualInstallOption();
+            } else {
+                const failedCriteria = Object.entries(criteria).filter(([, met]) => !met);
+                console.log('PWA criteria not met:', failedCriteria);
+                
+                // Provide specific guidance for failed criteria
+                failedCriteria.forEach(([criterion, met]) => {
+                    if (!met) {
+                        switch (criterion) {
+                            case 'hasManifest':
+                                console.warn('Missing manifest.json link');
+                                break;
+                            case 'hasServiceWorker':
+                                console.warn('Service Worker not supported in this browser');
+                                break;
+                            case 'isHTTPS':
+                                console.warn('HTTPS required for PWA installation');
+                                break;
+                            case 'hasIcons':
+                                console.warn('Missing icon links with sizes attribute');
+                                break;
+                            case 'isNotAlreadyInstalled':
+                                console.warn('PWA is already installed');
+                                break;
+                        }
+                    }
+                });
+            }
+        }
+        
+        // Show manual install option for browsers that don't support beforeinstallprompt
+        function showManualInstallOption() {
+            const installPrompt = document.getElementById('installPrompt');
+            if (installPrompt && !deferredPrompt) {
+                installPrompt.innerHTML = `
+                    <p><strong>🏜️ Add to Home Screen</strong></p>
+                    <p>This app can be installed on your device for quick access and offline use.</p>
+                    <div style="margin: 15px 0; padding: 12px; background: rgba(255,255,255,0.1); border-radius: 8px;">
+                        <p style="margin: 0 0 8px 0; font-size: 14px;"><strong>Installation Instructions:</strong></p>
+                        <p style="margin: 0; font-size: 13px;">
+                            <strong>Chrome/Edge:</strong> Tap the menu (⋮) → "Add to Home screen"<br>
+                            <strong>Safari:</strong> Tap the share button → "Add to Home Screen"<br>
+                            <strong>Firefox:</strong> Tap the menu (☰) → "Install App"
+                        </p>
+                    </div>
+                    <button class="btn btn-success" onclick="hideInstallPrompt()">Got it!</button>
+                `;
+                installPrompt.classList.remove('hidden');
+            }
         }
 
         // Install PWA
         async function installPWA() {
+            console.log('Install PWA function called');
+            
             if (deferredPrompt) {
-                deferredPrompt.prompt();
-                const { outcome } = await deferredPrompt.userChoice;
-                
-                if (outcome === 'accepted') {
-                    console.log('User accepted the install prompt');
+                try {
+                    console.log('Showing native install prompt...');
+                    deferredPrompt.prompt();
+                    const { outcome } = await deferredPrompt.userChoice;
+                    
+                    console.log('Install prompt outcome:', outcome);
+                    
+                    if (outcome === 'accepted') {
+                        console.log('User accepted the install prompt');
+                        showSuccess('App installed successfully!');
+                    } else {
+                        console.log('User dismissed the install prompt');
+                    }
+                } catch (error) {
+                    console.error('Error during PWA installation:', error);
+                    showError('Installation failed. Please try again.');
+                } finally {
+                    deferredPrompt = null;
+                    hideInstallPrompt();
                 }
-                
-                deferredPrompt = null;
-                document.getElementById('installPrompt').classList.add('hidden');
+            } else {
+                console.log('No deferred prompt available');
+                showManualInstallOption();
             }
         }
 
