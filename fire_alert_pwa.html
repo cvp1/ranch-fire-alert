@@ -469,23 +469,27 @@
                     body: JSON.stringify({
                         name: name,
                         phone: phone,
-                        ranch_id: currentUser.ranch_id,
-                        user_id: currentUser.id
+                        ranch_id: parseInt(ranchId),
+                        fcm_token: token
                     })
                 });
                 
                 const result = await response.json();
                 if (result.success) {
-                    alert('🚨 Fire alert sent to all ranch members!');
-                    document.getElementById('alertTitle').value = '';
-                    document.getElementById('alertMessage').value = '';
-                    loadAlerts(); // Refresh alerts
+                    currentUser = {
+                        id: result.user_id,
+                        name: name,
+                        ranch_id: parseInt(ranchId)
+                    };
+                    
+                    localStorage.setItem('fireAlertUser', JSON.stringify(currentUser));
+                    showMainApp();
                 } else {
-                    alert('Failed to send alert. Please try again.');
+                    alert('Registration failed. Please try again.');
                 }
             } catch (error) {
-                console.error('Error sending alert:', error);
-                alert('Failed to send alert. Please check your connection.');
+                console.error('Registration error:', error);
+                alert('Registration failed. Please check your connection.');
             }
         }
         
@@ -599,17 +603,83 @@
             }
         }
         
-        // Handle foreground messages
+        // Handle foreground messages with maximum aggressiveness
         messaging.onMessage((payload) => {
             console.log('Message received in foreground:', payload);
             
-            // Show notification even when app is open
+            // Show notification even when app is open with enhanced urgency
             if (payload.notification) {
-                new Notification(payload.notification.title, {
-                    body: payload.notification.body,
+                const isCritical = payload.data?.severity === 'critical' || payload.data?.severity === 'high';
+                
+                const notification = new Notification(payload.notification.title, {
+                    body: isCritical ? `🚨 CRITICAL: ${payload.notification.body} - IMMEDIATE ACTION REQUIRED 🚨` : payload.notification.body,
                     icon: '/icon-192.png',
-                    badge: '/badge-72.png'
+                    badge: '/badge-72.png',
+                    tag: 'foreground-fire-alert',
+                    requireInteraction: true,
+                    silent: false,
+                    vibrate: isCritical ? 
+                        [2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000] : 
+                        [1000, 500, 1000, 500, 1000],
+                    data: {
+                        ...payload.data,
+                        urgency: isCritical ? 'critical' : 'normal',
+                        timestamp: Date.now()
+                    },
+                    actions: [
+                        {
+                            action: 'view',
+                            title: '🚨 VIEW ALERT',
+                            icon: '/icon-192.png'
+                        },
+                        {
+                            action: 'dismiss',
+                            title: 'Dismiss',
+                            icon: '/icon-192.png'
+                        }
+                    ],
+                    renotify: true
                 });
+                
+                // Play emergency sound for critical alerts
+                if (isCritical) {
+                    try {
+                        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        const oscillator = audioContext.createOscillator();
+                        const gainNode = audioContext.createGain();
+                        
+                        oscillator.connect(gainNode);
+                        gainNode.connect(audioContext.destination);
+                        
+                        // Emergency siren pattern
+                        oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+                        oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.2);
+                        oscillator.frequency.setValueAtTime(800, audioContext.currentTime + 0.4);
+                        oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.6);
+                        oscillator.frequency.setValueAtTime(800, audioContext.currentTime + 0.8);
+                        
+                        gainNode.gain.setValueAtTime(0.4, audioContext.currentTime);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 1.0);
+                        
+                        oscillator.start(audioContext.currentTime);
+                        oscillator.stop(audioContext.currentTime + 1.0);
+                    } catch (error) {
+                        console.log('Audio context not available:', error);
+                    }
+                    
+                    // Flash screen for critical alerts
+                    document.body.style.transition = 'background-color 0.1s';
+                    document.body.style.backgroundColor = '#ff0000';
+                    setTimeout(() => {
+                        document.body.style.backgroundColor = '';
+                    }, 300);
+                }
+                
+                notification.onclick = function() {
+                    window.focus();
+                    showTab('alerts');
+                    notification.close();
+                };
             }
             
             // Refresh data based on message type
@@ -648,115 +718,4 @@
         window.addEventListener('offline', () => updateConnectionStatus(false));
     </script>
 </body>
-</html> parseInt(ranchId),
-                        fcm_token: token
-                    })
-                });
-                
-                const result = await response.json();
-                if (result.success) {
-                    currentUser = {
-                        id: result.user_id,
-                        name: name,
-                        ranch_id: parseInt(ranchId)
-                    };
-                    
-                    localStorage.setItem('fireAlertUser', JSON.stringify(currentUser));
-                    showMainApp();
-                } else {
-                    alert('Registration failed. Please try again.');
-                }
-            } catch (error) {
-                console.error('Registration error:', error);
-                alert('Registration failed. Please check your connection.');
-            }
-        }
-        
-        // Show main app
-        function showMainApp() {
-            document.getElementById('registrationForm').classList.add('hidden');
-            document.getElementById('mainApp').classList.remove('hidden');
-            loadAlerts();
-            
-            // Set up periodic refresh
-            setInterval(loadAlerts, 30000); // Refresh every 30 seconds
-        }
-        
-        // Tab navigation
-        function showTab(tabName) {
-            // Hide all tabs
-            document.getElementById('alertsTab').classList.add('hidden');
-            document.getElementById('livestockTab').classList.add('hidden');
-            document.getElementById('adminTab').classList.add('hidden');
-            
-            // Remove active class from all tab buttons
-            document.querySelectorAll('.tab').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            
-            // Show selected tab
-            document.getElementById(tabName + 'Tab').classList.remove('hidden');
-            
-            // Add active class to clicked tab
-            event.target.classList.add('active');
-            
-            if (tabName === 'livestock') {
-                loadLivestockRequests();
-            }
-        }
-        
-        // Load active alerts
-        async function loadAlerts() {
-            try {
-                const response = await fetch(`/api/alerts?ranch_id=${currentUser.ranch_id}`);
-                const alerts = await response.json();
-                
-                const container = document.getElementById('currentAlerts');
-                const noAlerts = document.getElementById('noAlerts');
-                
-                if (alerts.length === 0) {
-                    container.innerHTML = '';
-                    noAlerts.classList.remove('hidden');
-                } else {
-                    noAlerts.classList.add('hidden');
-                    container.innerHTML = alerts.map(alert => `
-                        <div class="card alert-card ${alert.severity}">
-                            <div class="severity-badge severity-${alert.severity}">${alert.severity}</div>
-                            <h3>${alert.title}</h3>
-                            <p>${alert.message}</p>
-                            <div class="timestamp">
-                                ${new Date(alert.created_at).toLocaleString()}
-                            </div>
-                        </div>
-                    `).join('');
-                }
-                
-                updateConnectionStatus(true);
-            } catch (error) {
-                console.error('Error loading alerts:', error);
-                updateConnectionStatus(false);
-            }
-        }
-        
-        // Send fire alert (admin function)
-        async function sendFireAlert() {
-            const title = document.getElementById('alertTitle').value;
-            const message = document.getElementById('alertMessage').value;
-            const severity = document.getElementById('alertSeverity').value;
-            
-            if (!title || !message) {
-                alert('Please fill in all fields');
-                return;
-            }
-            
-            try {
-                const response = await fetch('/api/alerts', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        title: title,
-                        message: message,
-                        severity: severity,
-                        ranch_id:
+</html>

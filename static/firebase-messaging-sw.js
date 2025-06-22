@@ -16,40 +16,138 @@ firebase.initializeApp({
 
 const messaging = firebase.messaging();
 
-// Handle background messages
+// Handle background messages with maximum aggressiveness
 messaging.onBackgroundMessage((payload) => {
     console.log('Received background message:', payload);
     
-    const notificationTitle = payload.notification?.title || 'Fire Alert';
+    const notificationTitle = payload.notification?.title || '🔥 EMERGENCY FIRE ALERT 🔥';
     const notificationOptions = {
-        body: payload.notification?.body || 'New alert received',
+        body: payload.notification?.body || 'CRITICAL FIRE ALERT - IMMEDIATE ACTION REQUIRED',
         icon: '/static/icons/icon-192.png',
-        badge: '/static/icons/icon-72.png',
-        tag: 'fire-alert',
-        requireInteraction: true,
-        data: payload.data
+        badge: '/static/icons/icon-192.png',
+        tag: 'fire-alert-emergency',
+        requireInteraction: true, // Forces user to interact
+        silent: false, // Ensures sound plays
+        vibrate: [1000, 500, 1000, 500, 1000, 500, 1000], // Aggressive vibration pattern
+        data: {
+            ...payload.data,
+            timestamp: Date.now(),
+            priority: 'high',
+            urgency: 'critical'
+        },
+        actions: [
+            {
+                action: 'view',
+                title: '🚨 VIEW ALERT',
+                icon: '/static/icons/icon-192.png'
+            },
+            {
+                action: 'dismiss',
+                title: 'Dismiss',
+                icon: '/static/icons/icon-192.png'
+            }
+        ],
+        // Additional options for maximum visibility
+        renotify: true, // Always show even if same tag
+        dir: 'ltr',
+        lang: 'en-US'
     };
 
-    return self.registration.showNotification(notificationTitle, notificationOptions);
+    // Show multiple notifications for critical alerts
+    const severity = payload.data?.severity || 'critical';
+    if (severity === 'critical' || severity === 'high') {
+        // Show primary notification
+        self.registration.showNotification(notificationTitle, notificationOptions);
+        
+        // Show additional urgent notification after 2 seconds
+        setTimeout(() => {
+            self.registration.showNotification('🚨 URGENT: FIRE ALERT ACTIVE 🚨', {
+                body: 'Check your device immediately for critical fire information',
+                icon: '/static/icons/icon-192.png',
+                badge: '/static/icons/icon-192.png',
+                tag: 'fire-alert-urgent',
+                requireInteraction: true,
+                silent: false,
+                vibrate: [2000, 1000, 2000, 1000, 2000],
+                data: { type: 'urgent-reminder' }
+            });
+        }, 2000);
+    } else {
+        return self.registration.showNotification(notificationTitle, notificationOptions);
+    }
 });
 
-// Handle notification clicks
+// Handle notification clicks with maximum urgency
 self.addEventListener('notificationclick', (event) => {
     console.log('Notification clicked:', event);
     
     event.notification.close();
     
-    // Open the app when notification is clicked
+    // Play alert sound
+    if (event.notification.data?.urgency === 'critical') {
+        // Create audio context for emergency sound
+        const audioContext = new (self.AudioContext || self.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+        oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1);
+        oscillator.frequency.setValueAtTime(800, audioContext.currentTime + 0.2);
+        
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+        
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.3);
+    }
+    
+    // Open the app immediately with maximum focus
     event.waitUntil(
-        clients.matchAll().then((clientList) => {
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+            // Try to focus existing window first
             for (const client of clientList) {
-                if (client.url.includes(self.location.origin) && 'focus' in client) {
-                    return client.focus();
+                if (client.url.includes(self.location.origin)) {
+                    client.focus();
+                    // Navigate to alerts tab if possible
+                    client.postMessage({ type: 'showAlertsTab' });
+                    return;
                 }
             }
+            
+            // If no existing window, open new one
             if (clients.openWindow) {
                 return clients.openWindow('/');
             }
         })
     );
+});
+
+// Handle notification close events
+self.addEventListener('notificationclose', (event) => {
+    console.log('Notification closed:', event);
+    
+    // For critical alerts, show another notification after 30 seconds if not acknowledged
+    if (event.notification.data?.urgency === 'critical') {
+        setTimeout(() => {
+            // Check if app is focused
+            clients.matchAll().then(clientList => {
+                const hasFocusedClient = clientList.some(client => client.focused);
+                if (!hasFocusedClient) {
+                    self.registration.showNotification('⚠️ FIRE ALERT STILL ACTIVE ⚠️', {
+                        body: 'Critical fire alert requires your immediate attention',
+                        icon: '/static/icons/icon-192.png',
+                        badge: '/static/icons/icon-192.png',
+                        tag: 'fire-alert-reminder',
+                        requireInteraction: true,
+                        silent: false,
+                        vibrate: [1500, 750, 1500, 750, 1500],
+                        data: { type: 'reminder' }
+                    });
+                }
+            });
+        }, 30000);
+    }
 });

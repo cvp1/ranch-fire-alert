@@ -699,6 +699,33 @@
                 -ms-text-size-adjust: 100%;
             }
         }
+        
+        @keyframes slideIn {
+            from { transform: translateY(-100%); }
+            to { transform: translateY(0); }
+        }
+        
+        @keyframes slideOut {
+            from { transform: translateY(0); }
+            to { transform: translateY(-100%); }
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+        
+        @keyframes slideDown {
+            from { transform: translateY(-100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
+        @keyframes flash {
+            0% { background-color: transparent; }
+            50% { background-color: #ff0000; }
+            100% { background-color: transparent; }
+        }
     </style>
 </head>
 <body>
@@ -3226,30 +3253,251 @@
         function createNotification(alert) {
             console.log('Creating notification for alert:', alert.title);
             
-            const notification = new Notification(`🔥 ${alert.severity.toUpperCase()} Alert`, {
-                body: alert.message,
+            // Determine urgency based on severity
+            const isCritical = alert.severity === 'critical' || alert.severity === 'high';
+            const urgency = isCritical ? 'critical' : 'normal';
+            
+            const notification = new Notification(`🔥 ${alert.severity.toUpperCase()} FIRE ALERT 🔥`, {
+                body: isCritical ? `🚨 CRITICAL: ${alert.message} - IMMEDIATE ACTION REQUIRED 🚨` : alert.message,
                 icon: '/static/icons/icon-192.png',
                 badge: '/static/icons/icon-192.png',
                 tag: `alert-${alert.id}`,
-                requireInteraction: true,
-                data: { alertId: alert.id }
+                requireInteraction: true, // Force user interaction
+                silent: false, // Ensure sound plays
+                vibrate: isCritical ? 
+                    [2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000] : // Aggressive pattern for critical
+                    [1000, 500, 1000, 500, 1000], // Standard pattern for others
+                data: { 
+                    alertId: alert.id,
+                    severity: alert.severity,
+                    urgency: urgency,
+                    timestamp: Date.now()
+                },
+                actions: [
+                    {
+                        action: 'view',
+                        title: '🚨 VIEW DETAILS',
+                        icon: '/static/icons/icon-192.png'
+                    },
+                    {
+                        action: 'dismiss',
+                        title: 'Dismiss',
+                        icon: '/static/icons/icon-192.png'
+                    }
+                ],
+                renotify: true, // Always show even if same tag
+                dir: 'ltr',
+                lang: 'en-US'
             });
+            
+            // Play emergency sound for critical alerts
+            if (isCritical) {
+                try {
+                    // Create audio context for emergency sound
+                    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+                    
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    // Create emergency siren pattern
+                    oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+                    oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.2);
+                    oscillator.frequency.setValueAtTime(800, audioContext.currentTime + 0.4);
+                    oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.6);
+                    oscillator.frequency.setValueAtTime(800, audioContext.currentTime + 0.8);
+                    
+                    gainNode.gain.setValueAtTime(0.4, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 1.0);
+                    
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + 1.0);
+                } catch (error) {
+                    console.log('Audio context not available:', error);
+                }
+            }
             
             notification.onclick = function() {
                 console.log('Notification clicked, focusing window and showing alerts tab');
                 window.focus();
                 showTab('alerts');
                 notification.close();
+                
+                // For critical alerts, also trigger additional attention
+                if (isCritical) {
+                    // Flash the screen briefly
+                    document.body.style.transition = 'background-color 0.1s';
+                    document.body.style.backgroundColor = '#ff0000';
+                    setTimeout(() => {
+                        document.body.style.backgroundColor = '';
+                    }, 200);
+                    
+                    // Show additional in-app alert
+                    showCriticalAlertModal(alert);
+                }
             };
             
             notification.onshow = function() {
                 console.log('Notification shown successfully');
+                
+                // For critical alerts, show additional in-app notification
+                if (isCritical) {
+                    showInAppCriticalAlert(alert);
+                }
             };
             
             notification.onerror = function(error) {
                 console.error('Notification error:', error);
             };
+            
+            // For critical alerts, set up reminder notifications
+            if (isCritical) {
+                setTimeout(() => {
+                    // Check if user has interacted with the app
+                    if (!document.hasFocus()) {
+                        // Show reminder notification
+                        const reminderNotification = new Notification('⚠️ CRITICAL FIRE ALERT - ACTION REQUIRED ⚠️', {
+                            body: 'You have an active critical fire alert that requires immediate attention',
+                            icon: '/static/icons/icon-192.png',
+                            badge: '/static/icons/icon-192.png',
+                            tag: `reminder-${alert.id}`,
+                            requireInteraction: true,
+                            silent: false,
+                            vibrate: [3000, 1500, 3000, 1500, 3000],
+                            data: { type: 'reminder', alertId: alert.id }
+                        });
+                        
+                        reminderNotification.onclick = function() {
+                            window.focus();
+                            showTab('alerts');
+                            reminderNotification.close();
+                        };
+                    }
+                }, 30000); // 30 seconds
+            }
         }
+        
+        // Show critical alert modal for maximum attention
+        function showCriticalAlertModal(alert) {
+            // Remove any existing modal
+            const existingModal = document.getElementById('criticalAlertModal');
+            if (existingModal) {
+                existingModal.remove();
+            }
+            
+            const modal = document.createElement('div');
+            modal.id = 'criticalAlertModal';
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(255, 0, 0, 0.9);
+                z-index: 10000;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                animation: pulse 1s infinite;
+            `;
+            
+            modal.innerHTML = `
+                <div style="
+                    background: white;
+                    padding: 30px;
+                    border-radius: 15px;
+                    text-align: center;
+                    max-width: 90%;
+                    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+                ">
+                    <h1 style="color: #d32f2f; font-size: 24px; margin-bottom: 15px;">
+                        🚨 CRITICAL FIRE ALERT 🚨
+                    </h1>
+                    <p style="font-size: 18px; margin-bottom: 20px; color: #333;">
+                        ${alert.message}
+                    </p>
+                    <button onclick="this.parentElement.parentElement.remove(); showTab('alerts');" 
+                            style="
+                                background: #d32f2f;
+                                color: white;
+                                border: none;
+                                padding: 15px 30px;
+                                border-radius: 8px;
+                                font-size: 16px;
+                                cursor: pointer;
+                                font-weight: bold;
+                            ">
+                        VIEW ALERT DETAILS
+                    </button>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // Auto-remove after 10 seconds
+            setTimeout(() => {
+                if (modal.parentNode) {
+                    modal.remove();
+                }
+            }, 10000);
+        }
+        
+        // Show in-app critical alert banner
+        function showInAppCriticalAlert(alert) {
+            // Remove any existing banner
+            const existingBanner = document.getElementById('criticalAlertBanner');
+            if (existingBanner) {
+                existingBanner.remove();
+            }
+            
+            const banner = document.createElement('div');
+            banner.id = 'criticalAlertBanner';
+            banner.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                background: linear-gradient(45deg, #ff0000, #d32f2f);
+                color: white;
+                padding: 15px;
+                text-align: center;
+                z-index: 9999;
+                font-weight: bold;
+                font-size: 16px;
+                animation: slideDown 0.5s ease-out;
+                box-shadow: 0 4px 12px rgba(255,0,0,0.3);
+            `;
+            
+            banner.innerHTML = `
+                🚨 CRITICAL FIRE ALERT: ${alert.title} - CLICK TO VIEW DETAILS 🚨
+            `;
+            
+            banner.onclick = function() {
+                showTab('alerts');
+                banner.remove();
+            };
+            
+            document.body.appendChild(banner);
+            
+            // Auto-remove after 30 seconds
+            setTimeout(() => {
+                if (banner.parentNode) {
+                    banner.remove();
+                }
+            }, 30000);
+        }
+
+        // Listen for messages from service worker
+        navigator.serviceWorker.addEventListener('message', (event) => {
+            console.log('Message from service worker:', event.data);
+            
+            if (event.data.type === 'showAlertsTab') {
+                showTab('alerts');
+            }
+        });
+        
+        // Check for new alerts periodically
     </script>
 </body>
 </html>
